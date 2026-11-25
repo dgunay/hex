@@ -371,6 +371,7 @@ internal class KeyboardEngine(
                     .also {
                         it.standIn = standIn
                         it.suggestSwearWords = feedback.suggestSwearWords
+                        it.decoder.strong = feedback.strongAutocorrect
                         it.addsCapitals = feedback.autoCapitalize
                         it.adaptive = adaptive
                     }

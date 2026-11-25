@@ -133,6 +133,8 @@
     <string name="settings_popups_detail">Shows the letter above your finger</string>
     <string name="settings_haptics">Haptics</string>
     <string name="settings_haptics_detail">A light tap as you press Hex’s keys</string>
+    <string name="strong_autocorrect">Stronger autocorrect</string>
+    <string name="strong_autocorrect_detail">Fixes sloppier typos, but changes more unusual words</string>
     <string name="haptic_strength">Haptic strength</string>
     <string name="settings_test_keyboard">Test keyboard…</string>
     <string name="settings_privacy_line">Your voice and words stay on this phone</string>

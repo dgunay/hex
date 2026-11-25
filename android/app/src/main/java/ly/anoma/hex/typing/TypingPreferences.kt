@@ -34,6 +34,10 @@ internal class TypingPreferences(context: Context) {
     var haptics: Boolean
         get() = prefs.getBoolean("haptics", true)
         set(value) { prefs.edit().putBoolean("haptics", value).apply() }
+    /** Keyboard › Stronger autocorrect: corrects words further from the one meant (SpatialDecoder.strong). Off by default. */
+    var strongAutocorrect: Boolean
+        get() = prefs.getBoolean("strongAutocorrect", false)
+        set(value) { prefs.edit().putBoolean("strongAutocorrect", value).apply() }
     /** Keyboard › Haptic strength, in percent (10–100). 100, the default, plays the phone's own click and tick
      * as before; lower scales them down where the vibrator can. */
     var hapticStrength: Int
