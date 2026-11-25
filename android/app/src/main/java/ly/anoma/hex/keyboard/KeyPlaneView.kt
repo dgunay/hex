@@ -89,7 +89,7 @@ internal class KeyPlaneView(context: Context, private val ime: HexKeyboard, priv
     }
     /** The keys above the bottom row on [page], the number row included. */
     private fun upperHeight(page: KeyboardPage?) = bands(page).sumOf { it.pitch } + if (page?.digits != null) digitBand.pitch else 0
-    // Keyboard › Keys down to the bar takes away the gap and row 4's lower half gap, so its keycaps
+    // Keyboard › Remove bottom margin takes away the gap and row 4's lower half gap, so its keycaps
     // end where the system's bar begins.
     private val bottomExtra = if (ime.feedback.snugBottom) -insetBottom
         else px(if (landscape) KeyboardMetrics.BOTTOM_LANDSCAPE else KeyboardMetrics.BOTTOM)
@@ -152,11 +152,11 @@ internal class KeyPlaneView(context: Context, private val ime: HexKeyboard, priv
     private var swipe: KeyboardEngine.SwipeContext? = null
     private val trail = SwipeTrail(this, (ink and 0xFFFFFF) or ((if (ink.isLight()) 0x80 else 0x66) shl 24), 6 * density)
     private val preview = SwipePreview { post(it) }
-    // A held delete repeats letters. With Keyboard › Hold delete for words on, it takes no letters: past
+    // A held delete repeats letters. With Keyboard › Delete words when held on, it takes no letters: past
     // the hold threshold it takes whole words, sooner each time, as SwiftKey's does ([wordGap] is the next
     // word's wait). Where a word can't be read (a password field), it repeats letters as before.
     private var wordGap = 0L
-    /** Each word's wait over the last's, from Keyboard › Hold delete for words › Speed-up, read as delete goes down. */
+    /** Each word's wait over the last's, from Keyboard › Delete words when held › Acceleration, read as delete goes down. */
     private var wordShrink = 1.0
     private val repeatDelete = object : Runnable {
         override fun run() {

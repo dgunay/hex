@@ -135,7 +135,6 @@
     <string name="settings_haptics_detail">A light tap as you press Hex’s keys</string>
     <string name="strong_autocorrect">Stronger autocorrect</string>
     <string name="strong_autocorrect_detail">Fixes sloppier typos, but changes more unusual words</string>
-    <string name="haptic_strength">Haptic strength</string>
     <string name="settings_test_keyboard">Test keyboard…</string>
     <string name="settings_privacy_line">Your voice and words stay on this phone</string>
     <!-- Hex Preview has its own copy, with its update check (src/preview/res/values): edit both. -->
@@ -204,13 +203,13 @@
     <string name="number_row_detail">Shows 1–0 above the letters</string>
     <string name="fix_earlier_words">Fix earlier words</string>
     <string name="fix_earlier_words_detail">Go back into a word to see what else it could be, and what you first typed</string>
-    <string name="hold_delete_words">Hold delete for words</string>
-    <string name="hold_delete_words_detail">Held, delete takes whole words</string>
-    <string name="delete_word_first">First wait</string>
+    <string name="hold_delete_words">Delete words when held</string>
+    <string name="hold_delete_words_detail">Holding delete removes a word at a time, speeding up the longer you hold</string>
+    <string name="delete_word_first">Initial delay</string>
     <string name="delete_word_first_ms">%1$d ms</string>
-    <string name="delete_word_speedup">Speed-up</string>
-    <string name="snug_bottom">Keys down to the bar</string>
-    <string name="snug_bottom_detail">No gap under the bottom row</string>
+    <string name="delete_word_speedup">Acceleration</string>
+    <string name="snug_bottom">Remove bottom margin</string>
+    <string name="snug_bottom_detail">Moves the bottom row of keys down to the navigation bar</string>
     <string name="local_currency">Local currency</string>
     <string name="local_currency_detail">Uses your region’s currency on the ?123 page and d’s held symbol instead of $</string>
     <string name="keyboard_tools">Keyboard tools</string>

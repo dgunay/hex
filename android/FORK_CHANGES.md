@@ -10,13 +10,13 @@ Every change is off by default, except two small fixes that change nothing for a
 **Settings › Keyboard**, or in Labs where it extends an existing lab. With everything off, the keyboard behaves as
 upstream's does.
 
-Commit hashes are on the fork's branch and change when the branch is rebased; the subject lines stay the same.
+Each setting's commits still use the names it had when it was added. Commit hashes are on the fork's branch and change when the branch is rebased; the subject lines stay the same.
 
 ## Layout
 
-### Keys down to the bar
+### Remove bottom margin
 
-- **Switch:** Settings › Keyboard › Keys down to the bar (off). Changing it rebuilds the keyboard in place.
+- **Switch:** Settings › Keyboard › Remove bottom margin (off). Changing it rebuilds the keyboard in place.
 - **What:** removes the gap under the bottom row, so the bottom row's keycaps end where the system's navigation
   bar begins. With it off, they end Gboard's 12.2 dp above the bar, as upstream measured.
 - **Why:** SwiftKey has no gap there. On a phone with gesture navigation, the gap makes the bottom row feel
@@ -28,11 +28,11 @@ Commit hashes are on the fork's branch and change when the branch is rebased; th
 
 ## Delete
 
-### Hold delete for words
+### Delete words when held
 
-- **Switch:** Settings › Keyboard › Hold delete for words (off). While it's on, two sliders show under it:
-  - **First wait:** 200–1000 ms in steps of 50, 500 by default.
-  - **Speed-up:** 0–50% in steps of 5, 20 by default.
+- **Switch:** Settings › Keyboard › Delete words when held (off). While it's on, two sliders show under it:
+  - **Initial delay:** 200–1000 ms in steps of 50, 500 by default.
+  - **Acceleration:** 0–50% in steps of 5, 20 by default.
 - **What:** holding delete removes whole words, as SwiftKey's held delete does, starting gently and speeding up
   the longer you hold ("the longer you hold it, the faster it deletes"). A tap still deletes one letter.
 - **Why:** deleting a sentence letter by letter at the 50 ms repeat rate either overshoots or takes too long.
@@ -40,12 +40,12 @@ Commit hashes are on the fork's branch and change when the branch is rebased; th
 - **How:**
   - Delete still waits the usual 400 ms hold threshold (`DELETE_REPEAT_DELAY`, shared with letter repeat). Then it
     takes a word at once: no letters first.
-  - Each next word waits the previous gap times `1 − Speed-up`, starting from First wait, down to a floor of
+  - Each next word waits the previous gap times `1 − Acceleration`, starting from Initial delay, down to a floor of
     90 ms (`DELETE_WORD_FASTEST`). With the defaults: 500, 400, 320, 256… ms.
   - A "word" is what upstream's delete slide already takes: the word before the cursor plus the spaces and
     punctuation after it (`DeleteSlide.wordLengths`), deleted with `deleteSurroundingText`.
   - Each word plays `EFFECT_HEAVY_CLICK`, a stronger tap than a letter's, so you can count words by feel. It is
-    scaled by Haptic strength like every other tap.
+    played only while Haptics is on.
   - The settings are read when delete goes down, so changes apply on the next press.
 - **Limits:** password fields, `TYPE_NULL` editors (terminals), a selection, or an unknown cursor position can't
   be read as words, so there it repeats letters as before.
@@ -55,25 +55,6 @@ Commit hashes are on the fork's branch and change when the branch is rebased; th
   - `b24e58b7` Android Keyboard: Hold delete for words starts slower; Diagnostics names its tap
   - `01f2486b` Android Keyboard: Hold delete for words waits 500 ms for the second word
   - `fc7598bb` Android Keyboard: Hold delete for words' First wait and Speed-up
-
-## Haptics
-
-### Haptic strength
-
-- **Switch:** Settings › Keyboard › Haptic strength, a slider shown only while Haptics is on. It runs from 10 to
-  100% in steps of 10, and 100% is the default.
-- **What:** makes key taps lighter. Lifting the slider plays a key press at the new strength so you can feel it.
-- **Why:** the phone's predefined click is too strong on some phones, and upstream has no way to soften it.
-- **How:**
-  - At 100% it plays exactly what upstream played: the predefined `EFFECT_CLICK` on press and `EFFECT_TICK` on
-    release.
-  - Below 100% it plays the same click or tick as a composition primitive (`PRIMITIVE_CLICK`/`PRIMITIVE_TICK`)
-    scaled to the strength, where the vibrator supports primitives.
-  - Otherwise it plays a one-shot pulse (20 ms for a click, 12 for a tick) at that share of full amplitude, where
-    the vibrator has amplitude control.
-  - Otherwise it plays the effect unscaled.
-  - Every Hex tap goes through it: keys, long-press release, dictation start and end, and Hold delete's word tap.
-- **Commit:** `41fd084c` Android Keyboard: Haptic strength slider under Haptics.
 
 ## Autocorrect
 

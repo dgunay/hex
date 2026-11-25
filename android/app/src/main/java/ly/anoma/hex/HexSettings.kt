@@ -205,7 +205,6 @@ internal fun HexSettings(setup: Setup, speech: SpeechPreferences, typing: Typing
     val popups = remember(revision) { typing.popups }
     val haptics = remember(revision) { typing.haptics }
     val strongAutocorrect = remember(revision) { typing.strongAutocorrect }
-    val hapticStrength = remember(revision) { typing.hapticStrength }
     val letterSymbols = remember(revision) { typing.letterSymbols }
     val numberRow = remember(revision) { typing.numberRow }
     val snugBottom = remember(revision) { typing.snugBottom }
@@ -410,15 +409,12 @@ internal fun HexSettings(setup: Setup, speech: SpeechPreferences, typing: Typing
                                 { context.startActivity(Intent(Settings.ACTION_USER_DICTIONARY_SETTINGS)) })
                             Rule(); Toggle(stringResource(R.string.settings_popups), stringResource(R.string.settings_popups_detail), popups) { typing.popups = it }
                             Rule(); Toggle(stringResource(R.string.settings_haptics), stringResource(R.string.settings_haptics_detail), haptics) { typing.haptics = it }
-                            if (haptics) { Rule(); Strength(stringResource(R.string.haptic_strength), hapticStrength,
-                                TypingPreferences.HAPTIC_STRENGTH_MIN..100, change = { typing.hapticStrength = it },
-                                done = { tap(context, true, Tap.Press, it) }) }
                             Rule(); Toggle(stringResource(R.string.hold_delete_words), stringResource(R.string.hold_delete_words_detail), holdDeleteWords) { typing.holdDeleteWords = it }
                             if (holdDeleteWords) {
-                                Rule(); Strength(stringResource(R.string.delete_word_first), deleteWordFirst,
+                                Rule(); SettingSlider(stringResource(R.string.delete_word_first), deleteWordFirst,
                                     TypingPreferences.DELETE_WORD_FIRST_RANGE, step = 50,
                                     label = { context.getString(R.string.delete_word_first_ms, it) }, change = { typing.deleteWordFirst = it })
-                                Rule(); Strength(stringResource(R.string.delete_word_speedup), deleteWordSpeedup,
+                                Rule(); SettingSlider(stringResource(R.string.delete_word_speedup), deleteWordSpeedup,
                                     TypingPreferences.DELETE_WORD_SPEEDUP_RANGE, step = 5, change = { typing.deleteWordSpeedup = it })
                             }
                             Rule(); Toggle(stringResource(R.string.snug_bottom), stringResource(R.string.snug_bottom_detail), snugBottom) { typing.snugBottom = it }
@@ -795,11 +791,10 @@ private fun reflow(lines: List<String>) = buildString {
         if (action != null && value.isNotEmpty()) Label(value, muted = true, size = if (value == "›") 22 else 15)
     }
 }
-/** A slider in a settings card over [range] in steps of [step], its value shown as [label] puts it: [change] as it
- * moves, [done] once the finger lifts (to preview the value). Hex's own colours, Material's slider for touch and
- * TalkBack. */
-@Composable internal fun Strength(title: String, value: Int, range: IntRange, step: Int = 10, label: (Int) -> String = { "$it%" },
-                                  change: (Int) -> Unit, done: (Int) -> Unit = {}) {
+/** A slider in a settings card over [range] in steps of [step], its value shown as [label] puts it, calling [change]
+ * as it moves. Hex's own colours, Material's slider for touch and TalkBack. */
+@Composable internal fun SettingSlider(title: String, value: Int, range: IntRange, step: Int = 10,
+                                       label: (Int) -> String = { "$it%" }, change: (Int) -> Unit) {
     var shown by remember(value) { mutableIntStateOf(value) }
     Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 4.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -808,7 +803,7 @@ private fun reflow(lines: List<String>) = buildString {
         }
         androidx.compose.material3.Slider(value = shown.toFloat(), valueRange = range.first.toFloat()..range.last.toFloat(),
             steps = (range.last - range.first) / step - 1,
-            onValueChange = { shown = it.roundToInt(); change(shown) }, onValueChangeFinished = { done(shown) },
+            onValueChange = { shown = it.roundToInt(); change(shown) },
             colors = androidx.compose.material3.SliderDefaults.colors(thumbColor = colorResource(R.color.ink),
                 activeTrackColor = colorResource(R.color.ink), inactiveTrackColor = colorResource(R.color.modifier),
                 activeTickColor = colorResource(R.color.modifier), inactiveTickColor = colorResource(R.color.ink)))

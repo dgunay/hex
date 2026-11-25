@@ -38,11 +38,6 @@ internal class TypingPreferences(context: Context) {
     var strongAutocorrect: Boolean
         get() = prefs.getBoolean("strongAutocorrect", false)
         set(value) { prefs.edit().putBoolean("strongAutocorrect", value).apply() }
-    /** Keyboard › Haptic strength, in percent (10–100). 100, the default, plays the phone's own click and tick
-     * as before; lower scales them down where the vibrator can. */
-    var hapticStrength: Int
-        get() = prefs.getInt(HAPTIC_STRENGTH, 100).coerceIn(HAPTIC_STRENGTH_MIN, 100)
-        set(value) { prefs.edit().putInt(HAPTIC_STRENGTH, value.coerceIn(HAPTIC_STRENGTH_MIN, 100)).apply() }
     /** Labs › Keyboard › Symbols on letter keys: a held second or third row key offers its symbol first. */
     var letterSymbols: Boolean
         get() = prefs.getBoolean("letterSymbols", false)
@@ -51,12 +46,12 @@ internal class TypingPreferences(context: Context) {
     var numberRow: Boolean
         get() = prefs.getBoolean(NUMBER_ROW, false)
         set(value) { prefs.edit().putBoolean(NUMBER_ROW, value).apply() }
-    /** Keyboard › Keys down to the bar: no gap under the bottom row, so the keys sit on the system's
+    /** Keyboard › Remove bottom margin: no gap under the bottom row, so the keys sit on the system's
      * bar. Off by default (Gboard's 12.2 dp gap). */
     var snugBottom: Boolean
         get() = prefs.getBoolean(SNUG_BOTTOM, false)
         set(value) { prefs.edit().putBoolean(SNUG_BOTTOM, value).apply() }
-    /** Keyboard › Hold delete for words: a held delete takes letters, then whole words, faster the longer
+    /** Keyboard › Delete words when held: a held delete takes letters, then whole words, faster the longer
      * it is held (as SwiftKey's does). Off by default: held, delete repeats letters as Gboard's does. */
     /** Keyboard › Fix earlier words: going back into a word offers other words for it. Off by default. */
     var fixEarlierWords: Boolean
@@ -65,11 +60,11 @@ internal class TypingPreferences(context: Context) {
     var holdDeleteWords: Boolean
         get() = prefs.getBoolean("holdDeleteWords", false)
         set(value) { prefs.edit().putBoolean("holdDeleteWords", value).apply() }
-    /** Keyboard › Hold delete for words: the wait before the second word goes, in ms. */
+    /** Keyboard › Delete words when held: the wait before the second word goes, in ms. */
     var deleteWordFirst: Int
         get() = prefs.getInt(DELETE_WORD_FIRST, DELETE_WORD_FIRST_DEFAULT).coerceIn(DELETE_WORD_FIRST_RANGE)
         set(value) { prefs.edit().putInt(DELETE_WORD_FIRST, value.coerceIn(DELETE_WORD_FIRST_RANGE)).apply() }
-    /** Keyboard › Hold delete for words: how much sooner each word goes than the one before, in percent. */
+    /** Keyboard › Delete words when held: how much sooner each word goes than the one before, in percent. */
     var deleteWordSpeedup: Int
         get() = prefs.getInt(DELETE_WORD_SPEEDUP, DELETE_WORD_SPEEDUP_DEFAULT).coerceIn(DELETE_WORD_SPEEDUP_RANGE)
         set(value) { prefs.edit().putInt(DELETE_WORD_SPEEDUP, value.coerceIn(DELETE_WORD_SPEEDUP_RANGE)).apply() }
@@ -177,8 +172,6 @@ internal class TypingPreferences(context: Context) {
     companion object {
         const val SUGGEST_SWEAR_WORDS = "suggestSwearWords"
         const val NUMBER_ROW = "numberRow"
-        const val HAPTIC_STRENGTH = "hapticStrength"
-        const val HAPTIC_STRENGTH_MIN = 10
         const val DELETE_WORD_FIRST = "deleteWordFirst"
         const val DELETE_WORD_FIRST_DEFAULT = 500
         val DELETE_WORD_FIRST_RANGE = 200..1000
