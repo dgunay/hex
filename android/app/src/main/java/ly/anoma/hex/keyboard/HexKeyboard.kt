@@ -484,9 +484,14 @@ class HexKeyboard : InputMethodService() {
         view?.notice(StripNotice(getString(R.string.keyboard_word_forget, word), getString(R.string.keyboard_note_dismiss),
             tap = { forgetWord(word) }, dismiss = {}))
     }
+    /** Takes [word] out of Android's personal dictionary and, when Labs › Keyboard › SwiftKey words brought it in, out
+     * of the imported list too. */
     private fun forgetWord(word: String) {
         words.execute {
             runCatching { contentResolver.delete(UserDictionary.Words.CONTENT_URI, "${UserDictionary.Words.WORD} = ? COLLATE NOCASE", arrayOf(word)) }
+            val imported = ImportedWords.read(this)
+            val kept = imported.filterNot { it.equals(word, ignoreCase = true) }
+            if (kept.size != imported.size) runCatching { ImportedWords.save(this, kept) }
         }
     }
 

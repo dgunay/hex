@@ -5,8 +5,8 @@ came from switching to Hex's keyboard after SwiftKey and missing what it did. Th
 can be rebuilt upstream without taking this code: what it does, where its switch is, why it exists, how it
 works (the thresholds and Android APIs it relies on), its known limits, and its commit.
 
-Every change is off by default, except two small fixes that change nothing for anyone who never hits the case
-(the clause-mark space and the Android 17 voice hand-back, both listed below). Each setting is a toggle in
+Every change is off by default, except the Android 17 voice hand-back, a fix that changes nothing for anyone who
+never hits the case (listed below). Each setting is a toggle in
 **Settings › Keyboard**, or in Labs where it extends an existing lab. With everything off, the keyboard behaves as
 upstream's does.
 
@@ -74,19 +74,6 @@ Each setting's commits still use the names it had when it was added. Commit hash
   fixes this for words you keep.
 - **Commit:** `89c7797a` Android Keyboard: Stronger autocorrect corrects sloppier typing.
 
-### A clause mark takes autocorrect's space
-
-- **Switch:** none. It's a fix that always applies.
-- **What:** type "keyboadr", space (autocorrect makes it "keyboard "), then "." and you get "keyboard.", not
-  "keyboard .".
-- **Why:** upstream already pulled a mark back over the space a *picked* suggestion typed, but not over the space
-  that came with an *autocorrection*, so every corrected word before a comma or period left a stray space.
-- **How:** `KeyboardEngine` remembers the text before the cursor right after autocorrect, or a text replacement,
-  types its fix and space (`fixedAnchor`). A clause-ending mark typed there (`SpaceRules.takesPickedSpace`)
-  takes that space, as it does for a pick's. A space you typed yourself after an uncorrected word keeps the mark
-  apart, as before and as Gboard does.
-- **Commit:** `d5c4c8f0` Android Keyboard: A clause mark takes autocorrect's space, as it takes a pick's.
-
 ### Fix earlier words
 
 - **Switch:** Settings › Keyboard › Fix earlier words (off).
@@ -141,6 +128,7 @@ Each setting's commits still use the names it had when it was added. Commit hash
     without a permission.
   - Upstream's existing content observer reloads every model's personal words when the dictionary changes.
   - Removing deletes the dictionary rows with that word (`word = ? COLLATE NOCASE`).
+  - Removing also takes the word out of upstream's Labs › Keyboard › SwiftKey words list, if it came from there.
 - **Limits:**
   - Never in password fields, or fields that ask not to be learned from (incognito).
   - A word you simply type and keep, without tapping it or undoing a fix, isn't learned. Hex keeps no record of
@@ -203,3 +191,11 @@ Each setting's commits still use the names it had when it was added. Commit hash
   - `e9fc2c44` Android Keyboard: Hex's speech window takes input focus. An intermediate step, replaced by the next
     commit.
   - `f06fc06f` Android Keyboard: SwiftKey types Hex's dictation on Android 17.
+
+## Dropped because upstream built it
+
+- **A clause mark takes autocorrect's space** ("keyboadr", space, "." gave "keyboard." instead of "keyboard .").
+  Upstream added the same behaviour as Labs › Keyboard › Punctuation after autocorrect (#2814, off by default), so
+  this fork dropped its own always-on version and uses upstream's lab.
+- **Haptic strength** (a 10–100% slider for key taps). Removed from the fork as unneeded. Hold delete's heavier
+  per-word tap stayed.
