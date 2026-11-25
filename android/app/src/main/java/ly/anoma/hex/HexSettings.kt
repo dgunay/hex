@@ -411,11 +411,13 @@ internal fun HexSettings(setup: Setup, speech: SpeechPreferences, typing: Typing
                             Rule(); Toggle(stringResource(R.string.settings_haptics), stringResource(R.string.settings_haptics_detail), haptics) { typing.haptics = it }
                             Rule(); Toggle(stringResource(R.string.hold_delete_words), stringResource(R.string.hold_delete_words_detail), holdDeleteWords) { typing.holdDeleteWords = it }
                             if (holdDeleteWords) {
-                                Rule(); SettingSlider(stringResource(R.string.delete_word_first), deleteWordFirst,
-                                    TypingPreferences.DELETE_WORD_FIRST_RANGE, step = 50,
+                                // Its own settings, indented under it with no rule between, so they read as part of it.
+                                SettingSlider(stringResource(R.string.delete_word_first), deleteWordFirst,
+                                    TypingPreferences.DELETE_WORD_FIRST_RANGE, step = 50, indented = true,
                                     label = { context.getString(R.string.delete_word_first_ms, it) }, change = { typing.deleteWordFirst = it })
-                                Rule(); SettingSlider(stringResource(R.string.delete_word_speedup), deleteWordSpeedup,
-                                    TypingPreferences.DELETE_WORD_SPEEDUP_RANGE, step = 5, change = { typing.deleteWordSpeedup = it })
+                                SettingSlider(stringResource(R.string.delete_word_speedup), deleteWordSpeedup,
+                                    TypingPreferences.DELETE_WORD_SPEEDUP_RANGE, step = 5, indented = true, last = true,
+                                    change = { typing.deleteWordSpeedup = it })
                             }
                             Rule(); Toggle(stringResource(R.string.snug_bottom), stringResource(R.string.snug_bottom_detail), snugBottom) { typing.snugBottom = it }
                         }
@@ -792,13 +794,15 @@ private fun reflow(lines: List<String>) = buildString {
     }
 }
 /** A slider in a settings card over [range] in steps of [step], its value shown as [label] puts it, calling [change]
- * as it moves. Hex's own colours, Material's slider for touch and TalkBack. */
-@Composable internal fun SettingSlider(title: String, value: Int, range: IntRange, step: Int = 10,
-                                       label: (Int) -> String = { "$it%" }, change: (Int) -> Unit) {
+ * as it moves. Hex's own colours, Material's slider for touch and TalkBack. [indented] sets it under the switch above
+ * it as one of that switch's own settings (no rule between them); [last] gives the group its bottom space back. */
+@Composable internal fun SettingSlider(title: String, value: Int, range: IntRange, step: Int = 10, indented: Boolean = false,
+                                       last: Boolean = false, label: (Int) -> String = { "$it%" }, change: (Int) -> Unit) {
     var shown by remember(value) { mutableIntStateOf(value) }
-    Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 4.dp)) {
+    Column(Modifier.fillMaxWidth().padding(start = if (indented) 40.dp else 16.dp, end = 16.dp,
+        top = if (indented) 0.dp else 10.dp, bottom = if (indented && last) 10.dp else 4.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.weight(1f)) { Label(title, weight = FontWeight.Medium) }
+            Box(Modifier.weight(1f)) { Label(title, weight = if (indented) FontWeight.Normal else FontWeight.Medium) }
             Label(label(shown), muted = true, size = 15)
         }
         androidx.compose.material3.Slider(value = shown.toFloat(), valueRange = range.first.toFloat()..range.last.toFloat(),
