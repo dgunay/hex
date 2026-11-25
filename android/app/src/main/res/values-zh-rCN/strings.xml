@@ -177,6 +177,13 @@
     <string name="number_row">数字行</string>
     <string name="number_row_detail">在字母上方显示 1–0</string>
     <string name="fix_earlier_words">修改之前的词</string>
+    <string name="neural_autocorrect">神经网络自动更正</string>
+    <string name="neural_autocorrect_detail">借助手机上的小型语言模型，根据前文更正英文单词。需一次性下载 %1$d MB。</string>
+    <string name="neural_test">测试速度</string>
+    <string name="neural_testing">正在测试速度…</string>
+    <string name="neural_test_result">一般单词 %1$d 毫秒 · 最慢 %2$d 毫秒 · 再次测试</string>
+    <string name="neural_timing_none">用英文打字即可试用。第一个单词会加载模型。</string>
+    <string name="neural_timing">已检查 %1$d 个单词 · 一般 %2$d 毫秒 · 较慢的 %3$d 毫秒 · %4$d 个太慢，交给常规自动更正</string>
     <string name="fix_earlier_words_detail">回到一个词里，查看它可能是的其他词和你最初输入的内容</string>
     <string name="strong_autocorrect">更强的自动更正</string>
     <string name="strong_autocorrect_detail">能修正更潦草的错字，但也会改动更多少见的词</string>

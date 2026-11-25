@@ -203,6 +203,13 @@
     <string name="number_row">Number row</string>
     <string name="number_row_detail">Shows 1–0 above the letters</string>
     <string name="fix_earlier_words">Fix earlier words</string>
+    <string name="neural_autocorrect">Neural autocorrect</string>
+    <string name="neural_autocorrect_detail">Corrects English words using the words before them, with a small language model on the phone. One-time %1$d MB download.</string>
+    <string name="neural_test">Test speed</string>
+    <string name="neural_testing">Testing speed…</string>
+    <string name="neural_test_result">Typical word %1$d ms · slowest %2$d ms · Test again</string>
+    <string name="neural_timing_none">Type in English to try it. The first word loads the model.</string>
+    <string name="neural_timing">%1$d words checked · typical %2$d ms · slow ones %3$d ms · %4$d too slow, left to the usual autocorrect</string>
     <string name="fix_earlier_words_detail">Go back into a word to see what else it could be, and what you first typed</string>
     <string name="snug_bottom">Keys down to the bar</string>
     <string name="snug_bottom_detail">No gap under the bottom row</string>

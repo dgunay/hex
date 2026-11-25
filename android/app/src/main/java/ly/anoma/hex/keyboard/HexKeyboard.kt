@@ -55,6 +55,7 @@ import ly.anoma.hex.speech.typingLayout
 import ly.anoma.hex.typing.AdaptiveTouchStore
 import ly.anoma.hex.typing.ImportedWords
 import ly.anoma.hex.typing.PersonalDictionary
+import ly.anoma.hex.typing.NeuralAutocorrect
 import ly.anoma.hex.typing.PersonalWords
 import ly.anoma.hex.typing.SpatialDecoder
 import ly.anoma.hex.typing.TypingModel
@@ -129,7 +130,8 @@ class HexKeyboard : InputMethodService() {
     }
     internal val engine by lazy {
         KeyboardEngine(InputConnectionTarget(this), feedback, { layoutLanguage }, { typingLanguage },
-            { SpatialDecoder(TypingModel.asset(assets, it)) },
+            // Labs › Keyboard › Neural autocorrect reads English alone.
+            { SpatialDecoder(TypingModel.asset(assets, it)).also { d -> if (d.model.language == "en") d.neural = NeuralAutocorrect } },
             readPersonal = { PersonalWords.read(contentResolver, it, if (feedback.importedWords) ImportedWords.read(this) else emptyList()) },
             background = words,
             emoji = EmojiWords(assets, words),
@@ -138,6 +140,7 @@ class HexKeyboard : InputMethodService() {
             swipeUnavailable = ::swipeUnavailable,
             learnWord = ::learnWord)
     }
+    private fun neuralChanged() = NeuralAutocorrect.configure(this, feedback.neuralAutocorrect, feedback.neuralBudget)
     private val typingChanged = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
         if (key == TypingPreferences.SUGGEST_SWEAR_WORDS) engine.swearWordsChanged()
         if (key == TypingPreferences.KEY_COLORS || key == TypingPreferences.KEY_COLOR) recolor()
@@ -152,6 +155,7 @@ class HexKeyboard : InputMethodService() {
         if (key == TypingPreferences.PASSWORD_MANAGER_SUGGESTIONS) clearInline()
         if (key == TypingPreferences.HEIGHT) resize()
         if (key == TypingPreferences.ADAPTIVE_TOUCH) engine.adaptiveTouchChanged()
+        if (key == TypingPreferences.NEURAL_AUTOCORRECT || key == TypingPreferences.NEURAL_BUDGET) neuralChanged()
         if (key == TypingPreferences.HEX_KEY_LEFT) view?.hexKeySideChanged()
         if (key == TypingPreferences.USE_IMPORTED_WORDS || key == TypingPreferences.IMPORTED_WORDS) engine.personalWordsChanged()
         if (key == TypingPreferences.CLIPBOARD_HISTORY) clipKeeper.sync()
@@ -217,6 +221,7 @@ class HexKeyboard : InputMethodService() {
         setTheme(R.style.HexIme)
         super.onCreate()
         getSharedPreferences("typing", MODE_PRIVATE).registerOnSharedPreferenceChangeListener(typingChanged)
+        neuralChanged()
         contentResolver.registerContentObserver(UserDictionary.Words.CONTENT_URI, true, dictionaryChanged)
         capture = MicCapture(applicationContext, LocalSpeech(applicationContext), DictationPlace.Keyboard, update = ::showStatus, meter = ::showLevel,
             insert = ::commitSpeech)

@@ -54,6 +54,13 @@ internal class TypingWord(val decoder: SpatialDecoder, val spatial: Boolean) {
     private val drawn = ArrayList<SpatialDecoder.Tap>()
     private var personalized = false
     private var decision: SpatialDecoder.Decision? = null
+    // Labs › Keyboard › Neural autocorrect's completions: the word typed so far (lowercase) and its completions, most
+    // likely in the sentence first, once the model has read them; and the word they were last asked for.
+    private var ranked: Pair<String, List<String>>? = null
+    private var asked: String? = null
+    // The same for the next word after a space: the text before it and the words likeliest there, once read.
+    private var rankedNext: Pair<String, List<String>>? = null
+    private var askedNext: String? = null
     // The text before the word, the word before it (lowercase, null after punctuation) and
     // whether the word starts a sentence.
     private var before = ""
@@ -140,10 +147,9 @@ internal class TypingWord(val decoder: SpatialDecoder, val spatial: Boolean) {
                 val finished = currentToken(text.dropLast(1)) ?: return emptyList()
                 val previous = lookup(finished.lowercase())
                 val index = model.context(previous)
-                val next = if (index >= 0) model.nextWords(index, suggestSwearWords, fill = false) else emptyList()
-                (next + commonWords[model.language].orEmpty()).filter {
-                    it.lowercase() != previous && !model.neverSuggest.blocks(it.lowercase(), suggestSwearWords, index)
-                }
+                // Labs › Keyboard › Neural autocorrect: once the model has read them, the words likeliest after the
+                // whole sentence go first ("pick up my": "kids", where the pairs read only "my").
+                rankedNext?.takeIf { it.first == text }?.second ?: nextPool(previous, index, 3)
             }
         }.orEmpty()
         val upper = addsCapitals && (capitalize ?: startsSentence(text))
@@ -247,15 +253,20 @@ internal class TypingWord(val decoder: SpatialDecoder, val spatial: Boolean) {
         // Your own word, completed once two letters match, before the dictionary's: a word you added is
         // likelier what you mean than a reading's runner-up ("zor" offers "Zorbex" beside the fix "or").
         if (token.length >= 2) decoder.personal?.completions(lookup(token))?.firstOrNull()?.let { add(yours(it)) }
-        val short = if (!standIn && token.length <= 3) model.completionsAfter(lower, previous, suggestSwearWords).map { shown(model.text(it)) } else emptyList()
-        if (fix == null) short.firstOrNull { s -> pool.none { it.equals(s, ignoreCase = true) } }?.let(::add)
+        // Labs › Keyboard › Neural autocorrect: once the model has read them, the completions go likeliest in the
+        // sentence first ("gonna" for "go" after "We were probably"), in place of the word pairs' and frequency's.
+        val neural = ranked?.takeIf { it.first == before + '\u0000' + lower }?.second?.map(::shown)
+        val short = neural ?: if (!standIn && token.length <= 3) model.completionsAfter(lower, previous, suggestSwearWords).map { shown(model.text(it)) } else emptyList()
+        // The model's likeliest completion goes next to what space puts in, before the taps' other readings, so the
+        // strip that follows the pause keeps it ("gon": "gone" for space, then "gonna").
+        if (fix == null || neural != null) short.firstOrNull { s -> pool.none { it.equals(s, ignoreCase = true) } }?.let(::add)
         val readings = nearWords && !standIn && spatial && token.length >= 2 && !protected()
         fun reading(text: String) = if (decoder.personal?.owns(text) == true) yours(text) else shown(text)
         if (readings && token.length >= 3) for (r in decision().readings) add(reading(r.text))
         for (s in short) add(s)
         // Your own words before the rest of the dictionary's (iOS lists UILexicon terms with them).
         decoder.personal?.completions(lookup(token))?.forEach { add(yours(it)) }
-        if (!standIn) for (w in model.completions(lower, suggestSwearWords, previous)) add(shown(model.text(w)))
+        if (!standIn && neural == null) for (w in model.completions(lower, suggestSwearWords, previous)) add(shown(model.text(w)))
         if (readings && token.length < 3) for (r in decision().readings) add(reading(r.text))
         if (pool.isEmpty()) return listOf(typed)
         val first = if (fix != null) Suggestion(fix, Suggestion.Kind.Fix) else Suggestion(pool[0], Suggestion.Kind.Word)
@@ -263,9 +274,78 @@ internal class TypingWord(val decoder: SpatialDecoder, val spatial: Boolean) {
         return if (showTyped) listOf(typed) + words else words
     }
 
+    /** Labs › Keyboard › Neural autocorrect: asks the model, without waiting, how likely each completion of the word
+     * typed so far is in the sentence: the word pairs' few after the word before and the commonest, [NEURAL_COMPLETIONS]
+     * in all. [post] runs its answer on the keyboard's thread, where [answered] shows the strip again; a word typed on
+     * meanwhile has asked again, and the old answer is dropped. English only, as the rest of the lab. */
+    fun rankCompletions(post: (() -> Unit) -> Unit, answered: () -> Unit) {
+        val neural = decoder.neural?.takeIf { it.active } ?: return
+        if (!spatial || standIn || model.language != "en" || token.isEmpty() || token.length > MAX_LENGTH) return
+        val lower = lookup(token.lowercase())
+        // The same letters in another sentence are another question.
+        val key = before + '\u0000' + lower
+        if (ranked?.first == key || asked == key) return
+        val words = LinkedHashSet<String>()
+        if (token.length <= 3) for (w in model.completionsAfter(lower, previous, suggestSwearWords)) words += model.text(w)
+        for (w in model.completions(lower, suggestSwearWords, previous, NEURAL_COMPLETIONS)) {
+            if (words.size >= NEURAL_COMPLETIONS) break
+            words += model.text(w)
+        }
+        words.removeAll { it.equals(lower, ignoreCase = true) }
+        if (words.size < 2) return
+        asked = key
+        // As the decoder writes a word for the model: a capital only where one was typed, so space finds them read.
+        val capital = token.first().isUpperCase()
+        val list = words.toList()
+        val shownToModel = list.map { if (capital) it.replaceFirstChar(Char::uppercaseChar) else it }
+        neural.costsLater(before, shownToModel) { costs ->
+            post {
+                if (asked != key) return@post
+                ranked = key to list.indices.sortedBy { costs[it] }.map { list[it] }
+                answered()
+            }
+        }
+    }
+
+    /** The next words after [previous] (its word index [index]): the word pairs' likeliest [count], then the
+     * language's commonest. */
+    private fun nextPool(previous: String, index: Int, count: Int): List<String> {
+        val next = if (index >= 0) model.nextWords(index, suggestSwearWords, fill = false, count = count) else emptyList()
+        val common = if (count > 3) model.completions("", suggestSwearWords, index, count).map { model.text(it) } else emptyList()
+        return (next + commonWords[model.language].orEmpty() + common).distinctBy { it.lowercase() }.filter {
+            it.lowercase() != previous && !model.neverSuggest.blocks(it.lowercase(), suggestSwearWords, index)
+        }
+    }
+
+    /** Labs › Keyboard › Neural autocorrect: as [rankCompletions], for the words [predictions] offers after a space
+     * in the middle of a sentence: the word pairs' likeliest after the word before and the commonest words,
+     * [NEURAL_COMPLETIONS] in all, read with the whole text before them. */
+    fun rankPredictions(before: String, post: (() -> Unit) -> Unit, answered: () -> Unit) {
+        val neural = decoder.neural?.takeIf { it.active } ?: return
+        if (standIn || model.language != "en") return
+        val text = if (before.lastOrNull()?.let { it.isLetter() || it == '\'' || it == '\u2019' } == true) "$before " else before
+        if (startsSentence(text) || !text.last().isWhitespace() || text.dropLast(1).lastOrNull()?.let { it in midSentenceMarks } == true) return
+        if (rankedNext?.first == text || askedNext == text) return
+        val finished = currentToken(text.dropLast(1)) ?: return
+        val previous = lookup(finished.lowercase())
+        val list = nextPool(previous, model.context(previous), NEURAL_COMPLETIONS).take(NEURAL_COMPLETIONS)
+        if (list.size < 2) return
+        askedNext = text
+        // Written for the model as the strip shows them ("I", names with their capital).
+        neural.costsLater(text, list.map { displayed(it) }) { costs ->
+            post {
+                if (askedNext != text) return@post
+                rankedNext = text to list.indices.sortedBy { costs[it] }.map { list[it] }
+                answered()
+            }
+        }
+    }
+
     // A candidate cased as the word was typed, with the capital the strip shows for names.
     private fun shown(word: String) = matchCase(token, if (token.firstOrNull()?.isUpperCase() == true) word else displayed(word))
     fun letter(text: String, x: Double, y: Double, grid: KeyGrid) {
+        // Labs › Keyboard › Neural autocorrect reads the text before the word while the word is typed.
+        if (token.isEmpty() && spatial) decoder.neural?.takeIf { it.active }?.prepare(before)
         token += text; decision = null
         if (spatial && !literalOnly && taps.size < MAX_LENGTH) {
             val tap = decoder.score(grid, x, y)
@@ -283,8 +363,12 @@ internal class TypingWord(val decoder: SpatialDecoder, val spatial: Boolean) {
         if (taps.size == token.length) { taps.removeAt(taps.lastIndex); drawn.removeAt(drawn.lastIndex) }
         token = token.dropLast(1); decision = null
     }
-    private fun decision() = decision ?: guarded(decoder.decide(lookup(token.lowercase()), taps, previous, suggestSwearWords))
-        .also { decision = it }
+    private fun decision() = decision ?: guarded(decoder.decide(lookup(token.lowercase()), taps, previous, suggestSwearWords,
+        neuralContext(), token.firstOrNull()?.isUpperCase() == true)).also { decision = it }
+    // Labs › Keyboard › Neural autocorrect reads the word only as space or a mark finishes it ([finish]): the strip's
+    // readings while typing stay the word pairs'.
+    private var finishing = false
+    private fun neuralContext() = if (finishing && decoder.neural?.active == true) before else null
     // Adaptive touch's centres rank the readings, but space corrects a word only when the drawn centres would correct it
     // too, and puts in their reading unless yours also clears their margin: never a correction the keyboard wouldn't make
     // without them. Stricter than iPhone's AutocorrectEngine.decoderBaselineKeys, whose margin check alone let a reading
@@ -293,7 +377,8 @@ internal class TypingWord(val decoder: SpatialDecoder, val spatial: Boolean) {
         val replace = personal.replace
         if (!personalized || replace == null || adaptive?.guards == false) return personal
         val typed = lookup(token.lowercase())
-        val own = decoder.decide(typed, drawn, previous, suggestSwearWords).replace
+        val own = decoder.decide(typed, drawn, previous, suggestSwearWords, neuralContext(),
+            token.firstOrNull()?.isUpperCase() == true).replace
         val kept = when {
             own == null -> null
             own.equals(replace, ignoreCase = true) -> replace
@@ -465,7 +550,11 @@ internal class TypingWord(val decoder: SpatialDecoder, val spatial: Boolean) {
             }
         }
         if (result == null) {
-            val fix = replacement()
+            // The neural model reads the finished word with the text before it, so the decision is made again.
+            val fix = if (decoder.neural?.active != true) replacement() else {
+                finishing = true; decision = null
+                try { replacement() } finally { finishing = false; decision = null }
+            }
             val now = fix ?: token
             // A word typed or corrected with an apostrophe is left as it is, whether that apostrophe
             // is straight or the smart ’ (Labs › Keyboard › Smart quotes), and so is a Portuguese word
@@ -525,6 +614,9 @@ internal class TypingWord(val decoder: SpatialDecoder, val spatial: Boolean) {
     }
     companion object {
         const val MAX_LENGTH = 32
+        /** How many completions Labs › Keyboard › Neural autocorrect reads, in two of the model's batches: the 11
+         * commonest "go…" words leave out "gonna". */
+        const val NEURAL_COMPLETIONS = 24
         /** Words a revisited word offers beside what autocorrect replaced (Keyboard › Fix earlier words). */
         const val REVISIT_WORDS = 3
         /** How much less likely than the word as it stands, in nats, an offer for a revisited word may be. */

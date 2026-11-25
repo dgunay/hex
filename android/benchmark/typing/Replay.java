@@ -253,7 +253,21 @@ public final class Replay {
         TypingModel model=TypingModel.Companion.file(new File(args[0]),lang);
         // `MODEL SET LANG OUT [GEOMETRY]`: with a measured geometry, any number of sentences.
         boolean measured=!gate && args.length>4 && !args[4].startsWith("--");
-        KeyGrid grid=measured ? geometry(args[4]) : originalGeometry(lang); TypingWord state=new TypingWord(new SpatialDecoder(model), true);
+        KeyGrid grid=measured ? geometry(args[4]) : originalGeometry(lang); SpatialDecoder decoder=new SpatialDecoder(model);
+        // Labs › Keyboard › Neural autocorrect: -Dhex.typing.model=GGUF (with -Dhex.typing.lib=libhextyping.so) scores the
+        // readings with that model; -Dhex.typing.weight sets its weight.
+        String neural=System.getProperty("hex.typing.model");
+        if(neural!=null) {
+            NeuralModel m=NeuralModel.Companion.open(neural, Integer.getInteger("hex.typing.threads", 4));
+            if(m==null) throw new IllegalStateException("Neural model didn't load: "+neural);
+            decoder.setNeural(m);
+            String weight=System.getProperty("hex.typing.weight");
+            if(weight!=null) decoder.setNeuralWeight(Double.parseDouble(weight));
+            String stray=System.getProperty("hex.typing.stray");
+            if(stray!=null) decoder.setStrayLetterCost(Double.parseDouble(stray));
+            if("false".equals(System.getProperty("hex.typing.splits"))) decoder.setNeuralSplits(false);
+        }
+        TypingWord state=new TypingWord(decoder, true);
         // `--gate` options for Labs › Keyboard › Adaptive touch's checks (quality-gate.py --adaptive): a typist who aims
         // off the centres, and Adaptive touch learning as the keyboard does, or reading a profile learned before.
         Map<String,String> options=new HashMap<>();

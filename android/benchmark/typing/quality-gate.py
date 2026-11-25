@@ -206,6 +206,30 @@ def adaptive(lang, model, rows, cases, gate_input, gate_output, tmp, command):
     return report
 
 
+def replay_gate(command, model, path, inputs, lang, tmp):
+    """The gate's sentences through Replay. With Neural autocorrect (-Dhex.typing.model), split across processes of
+    four threads each, leaving two cores free: every sentence starts a field of its own, so the split changes nothing."""
+    neural = any(c.startswith('-Dhex.typing.model=') for c in map(str, command))
+    shards = max(1, (os.cpu_count() - 2) // 4) if neural else 1
+    if shards == 1:
+        return subprocess.check_output(command + ['local.hex.bench.Replay', model, path, lang, '--gate'],
+                                       encoding='utf-8').splitlines()
+    size = -(-len(inputs) // shards)
+    runs = []
+    for i in range(shards):
+        part = tmp / f'input-{i}.tsv'
+        part.write_text('\n'.join(inputs[i*size:(i+1)*size]) + '\n', encoding='utf-8')
+        runs.append(subprocess.Popen(command + ['local.hex.bench.Replay', model, part, lang, '--gate'],
+                                     stdout=subprocess.PIPE, encoding='utf-8'))
+    output = []
+    for run in runs:
+        out, _ = run.communicate()
+        if run.returncode:
+            raise subprocess.CalledProcessError(run.returncode, run.args)
+        output += out.splitlines()
+    return output
+
+
 def score(lang, mapping, cases, limits, tmp, command):
     with gzip.open(HERE / 'held-out' / (lang + '.tsv.gz'), 'rt', encoding='utf-8') as f:
         rows = [line.rstrip('\n').split('\t') for line in f]
@@ -249,8 +273,7 @@ def score(lang, mapping, cases, limits, tmp, command):
     inputs += [typed + ' ' for _, typed, _ in cases]
     path = tmp / 'input.tsv'
     path.write_text('\n'.join(inputs) + '\n', encoding='utf-8')
-    output = subprocess.check_output(command + ['local.hex.bench.Replay', model, path, lang, '--gate'],
-                                     encoding='utf-8').splitlines()
+    output = replay_gate(command, model, path, inputs, lang, tmp)
     if len(output) != len(inputs):
         raise ValueError(f'{lang}: replay returned {len(output)} of {len(inputs)} sentences')
     # Score spelling case-insensitively, as before; input to the engine above retains Shift.
@@ -324,6 +347,9 @@ def main():
     parser.add_argument('language', nargs='?', default='all', choices=['all'] + languages)
     parser.add_argument('--output', type=Path, default=ANDROID/'build/typing-quality.json')
     parser.add_argument('--adaptive', action='store_true', help='also check Labs › Keyboard › Adaptive touch (adaptive())')
+    parser.add_argument('--neural', type=Path, help='Labs › Keyboard › Neural autocorrect: a GGUF model to score readings with')
+    parser.add_argument('--neural-lib', type=Path, help='libhextyping.so built for this host')
+    parser.add_argument('--neural-weight', type=float, help='the model\'s weight against the taps (default 1.5)')
     args = parser.parse_args()
     start = time.monotonic()
     results = []
@@ -335,6 +361,10 @@ def main():
         jdk = Path(os.environ['JAVA_HOME']) / 'bin' if 'JAVA_HOME' in os.environ else Path('')
         subprocess.run([jdk/'javac', '-encoding', 'UTF-8', '-cp', cp.read_text(), '-d', tmp, HERE/'Replay.java', HERE/'GateLexicon.java'], check=True)
         command = [jdk/'java', '-Xmx768m', '-Dfile.encoding=UTF-8', '-cp', str(tmp)+os.pathsep+cp.read_text()]
+        if args.neural:
+            command[1:1] = ['-Dhex.typing.model='+str(args.neural.resolve()), '-Dhex.typing.lib='+str(args.neural_lib.resolve())]
+            if args.neural_weight is not None:
+                command[1:1] = [f'-Dhex.typing.weight={args.neural_weight}']
         print('Lang   Noisy WER  Reduction   Changed  Unambig.  Ambig.  Harm   Critical  Gate', flush=True)
         for lang in languages if args.language == 'all' else [args.language]:
             r = score(lang, maps[lang], cases[lang], limits, tmp, command)

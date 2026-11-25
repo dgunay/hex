@@ -916,7 +916,7 @@ internal class KeyPlaneView(context: Context, private val ime: HexKeyboard, priv
         forgetStroke(); preview.next(); trail.fade()
         if (st == null || s == null) return
         val grid = geometry() ?: run { ime.engine.cancelSwipe(); return }
-        val readings = s.reader.ranked(s.reader.decode(st.xs, st.ys, st.ts, st.count, grid, s.previous, 8).candidates)
+        val readings = s.reader.ranked(s.reader.decode(st.xs, st.ys, st.ts, st.count, grid, s.previous, 8, s.context, s.cased).candidates)
         val letter = key?.let { slidTap(st, it, grid) }
         if (key != null && letter != null && readings.firstOrNull()?.let { startsAndEnds(it, letter) } != true) {
             // A tap that slid ("a" dragged a little too far and back): its letter goes in as a tap's would.

@@ -117,6 +117,7 @@ class MainActivity : ComponentActivity() {
         refresh()
         ModelStore.small.refresh(this)
         ModelStore.english.refresh(this)
+        ModelStore.neural.refresh(this)
         setContent {
             HexTheme {
                 BackHandler(page == 2) { go(1) }
