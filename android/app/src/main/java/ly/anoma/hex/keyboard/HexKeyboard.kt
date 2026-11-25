@@ -143,6 +143,7 @@ class HexKeyboard : InputMethodService() {
         if (key == TypingPreferences.KEY_COLORS || key == TypingPreferences.KEY_COLOR) recolor()
         if (key == TypingPreferences.NUMBER_ROW) engine.numberRowChanged()
         if (key == TypingPreferences.SWIFTKEY_LAYOUT) engine.swiftKeyLayoutChanged()
+        if (key == TypingPreferences.SNUG_BOTTOM) rebuildKeyboard()
         if (key == TypingPreferences.LOCAL_CURRENCY) engine.localCurrencyChanged()
         if (key == TypingPreferences.EMOJI_SUGGESTIONS) engine.emojiSuggestionsChanged()
         if (key == TypingPreferences.KEYBOARD_TOOLS) { engine.keyboardToolsChanged(); watchClipboard() }
@@ -258,6 +259,17 @@ class HexKeyboard : InputMethodService() {
             })
             view = it; engine.surface = it
         }
+    }
+
+    /** A lab that changes the keys' geometry changed: build the keyboard again, as a mode change does. */
+    private fun rebuildKeyboard() {
+        if (view == null) return
+        setInputView(inputView())
+        if (!isInputViewShown) return
+        engine.configureTyping()
+        view?.status(capture.phase, idleHint())
+        viewing = true
+        watchClipboard()
     }
 
     /** The voice subtype, or its lab, changed under a shown or remembered view: swap it and start dictation.

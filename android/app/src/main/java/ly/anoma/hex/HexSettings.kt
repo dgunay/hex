@@ -213,6 +213,7 @@ internal fun HexSettings(setup: Setup, speech: SpeechPreferences, typing: Typing
     val haptics = remember(revision) { typing.haptics }
     val letterSymbols = remember(revision) { typing.letterSymbols }
     val numberRow = remember(revision) { typing.numberRow }
+    val snugBottom = remember(revision) { typing.snugBottom }
     val localCurrency = remember(revision) { typing.localCurrency }
     var copied by remember(transcript) { mutableStateOf(false) }
     fun open(next: Page) {
@@ -408,6 +409,7 @@ internal fun HexSettings(setup: Setup, speech: SpeechPreferences, typing: Typing
                                 { context.startActivity(Intent(Settings.ACTION_USER_DICTIONARY_SETTINGS)) })
                             Rule(); Toggle(stringResource(R.string.settings_popups), stringResource(R.string.settings_popups_detail), popups) { typing.popups = it }
                             Rule(); Toggle(stringResource(R.string.settings_haptics), stringResource(R.string.settings_haptics_detail), haptics) { typing.haptics = it }
+                            Rule(); Toggle(stringResource(R.string.snug_bottom), stringResource(R.string.snug_bottom_detail), snugBottom) { typing.snugBottom = it }
                         }
                         // With Labs › Keyboard › Test keyboard on Home, the field is on Home instead.
                         if (!testOnHome) PracticeCard(practice) { practice = it }

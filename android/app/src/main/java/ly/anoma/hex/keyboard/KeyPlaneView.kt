@@ -90,7 +90,10 @@ internal class KeyPlaneView(context: Context, private val ime: HexKeyboard, priv
     }
     /** The keys above the bottom row on [page], the number row included. */
     private fun upperHeight(page: KeyboardPage?) = bands(page).sumOf { it.pitch } + if (page?.digits != null) digitBand.pitch else 0
-    private val bottomExtra = px(if (landscape) KeyboardMetrics.BOTTOM_LANDSCAPE else KeyboardMetrics.BOTTOM)
+    // Keyboard › Keys down to the bar takes away the gap and row 4's lower half gap, so its keycaps
+    // end where the system's bar begins.
+    private val bottomExtra = if (ime.feedback.snugBottom) -insetBottom
+        else px(if (landscape) KeyboardMetrics.BOTTOM_LANDSCAPE else KeyboardMetrics.BOTTOM)
     private val reach = if (landscape) 0 else px(KeyboardMetrics.ROW1_REACH)
     private val side = KeyboardMetrics.SIDE * density
     private val gap = KeyboardMetrics.GAP * density
