@@ -155,7 +155,9 @@ internal class KeyPlaneView(context: Context, private val ime: HexKeyboard, priv
     // A held delete repeats letters. With Keyboard › Hold delete for words on, it takes no letters: past
     // the hold threshold it takes whole words, sooner each time, as SwiftKey's does ([wordGap] is the next
     // word's wait). Where a word can't be read (a password field), it repeats letters as before.
-    private var wordGap = KeyboardMetrics.DELETE_WORD_FIRST
+    private var wordGap = 0L
+    /** Each word's wait over the last's, from Keyboard › Hold delete for words › Speed-up, read as delete goes down. */
+    private var wordShrink = 1.0
     private val repeatDelete = object : Runnable {
         override fun run() {
             if (!deleting) return
@@ -163,7 +165,7 @@ internal class KeyPlaneView(context: Context, private val ime: HexKeyboard, priv
             if (ime.feedback.holdDeleteWords && ime.engine.deleteWord()) {
                 tap(context, ime.feedback.haptics, Tap.Word)
                 postDelayed(this, wordGap)
-                wordGap = maxOf(KeyboardMetrics.DELETE_WORD_FASTEST, (wordGap * KeyboardMetrics.DELETE_WORD_SPEEDUP).toLong())
+                wordGap = maxOf(KeyboardMetrics.DELETE_WORD_FASTEST, (wordGap * wordShrink).toLong())
             } else {
                 ime.engine.delete(); postDelayed(this, KeyboardMetrics.DELETE_REPEAT_EVERY)
             }
@@ -588,7 +590,8 @@ internal class KeyPlaneView(context: Context, private val ime: HexKeyboard, priv
                 MotionEvent.ACTION_DOWN -> {
                     roll.down(v) { lift(typing = true) }
                     repeated = false; deleting = true; v.isPressed = true; deleteSlide = null
-                    wordGap = KeyboardMetrics.DELETE_WORD_FIRST
+                    wordGap = ime.feedback.deleteWordFirst.toLong()
+                    wordShrink = 1 - ime.feedback.deleteWordSpeedup / 100.0
                     deleteGesture.down(e.x)
                     postDelayed(repeatDelete, KeyboardMetrics.DELETE_REPEAT_DELAY)
                 }

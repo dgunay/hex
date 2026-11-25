@@ -65,6 +65,14 @@ internal class TypingPreferences(context: Context) {
     var holdDeleteWords: Boolean
         get() = prefs.getBoolean("holdDeleteWords", false)
         set(value) { prefs.edit().putBoolean("holdDeleteWords", value).apply() }
+    /** Keyboard › Hold delete for words: the wait before the second word goes, in ms. */
+    var deleteWordFirst: Int
+        get() = prefs.getInt(DELETE_WORD_FIRST, DELETE_WORD_FIRST_DEFAULT).coerceIn(DELETE_WORD_FIRST_RANGE)
+        set(value) { prefs.edit().putInt(DELETE_WORD_FIRST, value.coerceIn(DELETE_WORD_FIRST_RANGE)).apply() }
+    /** Keyboard › Hold delete for words: how much sooner each word goes than the one before, in percent. */
+    var deleteWordSpeedup: Int
+        get() = prefs.getInt(DELETE_WORD_SPEEDUP, DELETE_WORD_SPEEDUP_DEFAULT).coerceIn(DELETE_WORD_SPEEDUP_RANGE)
+        set(value) { prefs.edit().putInt(DELETE_WORD_SPEEDUP, value.coerceIn(DELETE_WORD_SPEEDUP_RANGE)).apply() }
     /** Labs › Keyboard › Local currency: the phone's own currency on the ?123 page and d's held symbol
      * instead of $. Off by default. */
     var localCurrency: Boolean
@@ -171,6 +179,12 @@ internal class TypingPreferences(context: Context) {
         const val NUMBER_ROW = "numberRow"
         const val HAPTIC_STRENGTH = "hapticStrength"
         const val HAPTIC_STRENGTH_MIN = 10
+        const val DELETE_WORD_FIRST = "deleteWordFirst"
+        const val DELETE_WORD_FIRST_DEFAULT = 500
+        val DELETE_WORD_FIRST_RANGE = 200..1000
+        const val DELETE_WORD_SPEEDUP = "deleteWordSpeedup"
+        const val DELETE_WORD_SPEEDUP_DEFAULT = 20
+        val DELETE_WORD_SPEEDUP_RANGE = 0..50
         const val SNUG_BOTTOM = "snugBottom"
         const val LOCAL_CURRENCY = "localCurrency"
         const val EMOJI_SUGGESTIONS = "emojiSuggestions"

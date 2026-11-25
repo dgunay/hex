@@ -206,6 +206,9 @@
     <string name="fix_earlier_words_detail">Go back into a word to see what else it could be, and what you first typed</string>
     <string name="hold_delete_words">Hold delete for words</string>
     <string name="hold_delete_words_detail">Held, delete takes whole words</string>
+    <string name="delete_word_first">First wait</string>
+    <string name="delete_word_first_ms">%1$d ms</string>
+    <string name="delete_word_speedup">Speed-up</string>
     <string name="snug_bottom">Keys down to the bar</string>
     <string name="snug_bottom_detail">No gap under the bottom row</string>
     <string name="local_currency">Local currency</string>
