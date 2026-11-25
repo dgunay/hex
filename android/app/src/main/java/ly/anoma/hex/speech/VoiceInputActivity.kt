@@ -18,7 +18,9 @@ import ly.anoma.hex.keyboard.speechNote
  * Labs › Keyboard › Voice-only mode, for keyboards and apps that ask Android to recognise speech
  * ([RecognizerIntent.ACTION_RECOGNIZE_SPEECH]) rather than switch to a voice keyboard: SwiftKey's mic key, with
  * Google Voice Typing off, does. Hex's dictation bar over the app, recording at once; ✓ hands the text back as the
- * request's result, ✕ or leaving hands back nothing. The activity is enabled only while the lab is on, so with it
+ * request's result, ✕ or leaving hands back nothing. The keyboard that asked types the text only once the app's field
+ * connects to it again, and SwiftKey can't read some apps' fields at that moment (the Claude app; Discord unfocuses
+ * its box): there the text goes in when the field is tapped. The activity is enabled only while the lab is on, so with it
  * off Hex never answers the request.
  */
 class VoiceInputActivity : Activity() {
@@ -28,6 +30,9 @@ class VoiceInputActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // This window takes input focus (no FLAG_ALT_FOCUSABLE_IM), so the app's field connects to the keyboard again
+        // once it closes: the keyboard that asked (SwiftKey) holds the text until it does, and Android 17 skips the
+        // reconnect when focus comes back to a window it thinks never lost it.
         setFinishOnTouchOutside(true)
         bar = VoiceBarView(this, ::tap, ::cancel)
         setContentView(FrameLayout(this).apply {
