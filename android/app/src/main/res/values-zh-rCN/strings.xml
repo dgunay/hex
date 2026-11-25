@@ -176,6 +176,8 @@
     <string name="letter_symbols_detail">长按字母输入符号，例如长按 m 输入 ?</string>
     <string name="number_row">数字行</string>
     <string name="number_row_detail">在字母上方显示 1–0</string>
+    <string name="strong_autocorrect">更强的自动更正</string>
+    <string name="strong_autocorrect_detail">能修正更潦草的错字，但也会改动更多少见的词</string>
     <string name="snug_bottom">按键贴底</string>
     <string name="snug_bottom_detail">底排按键下方不留空隙</string>
     <string name="local_currency">本地货币</string>

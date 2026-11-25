@@ -211,6 +211,7 @@ internal fun HexSettings(setup: Setup, speech: SpeechPreferences, typing: Typing
     val swipe = remember(revision) { typing.swipe }
     val popups = remember(revision) { typing.popups }
     val haptics = remember(revision) { typing.haptics }
+    val strongAutocorrect = remember(revision) { typing.strongAutocorrect }
     val letterSymbols = remember(revision) { typing.letterSymbols }
     val numberRow = remember(revision) { typing.numberRow }
     val snugBottom = remember(revision) { typing.snugBottom }
@@ -402,6 +403,7 @@ internal fun HexSettings(setup: Setup, speech: SpeechPreferences, typing: Typing
                             Rule(); Toggle(stringResource(R.string.settings_autocorrect), stringResource(R.string.settings_autocorrect_detail), autocorrect) { typing.autocorrect = it }
                             // Shown under Autocorrect while it is on, as on iPhone (it was alone on an Experiments page, on by default).
                             if (autocorrect) { Rule(); Toggle(stringResource(R.string.settings_spatial), stringResource(R.string.settings_spatial_detail), spatial) { typing.spatial = it } }
+                            if (autocorrect) { Rule(); Toggle(stringResource(R.string.strong_autocorrect), stringResource(R.string.strong_autocorrect_detail), strongAutocorrect) { typing.strongAutocorrect = it } }
                             Rule(); Toggle(stringResource(R.string.settings_swipe), stringResource(R.string.settings_swipe_detail), swipe) { typing.swipe = it }
                             Rule(); Toggle(stringResource(R.string.settings_swear_words), stringResource(R.string.settings_swear_words_detail), swearWords) { typing.suggestSwearWords = it }
                             // The words the keyboard keeps and suggests are Android's own personal dictionary.

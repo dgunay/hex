@@ -28,6 +28,9 @@ internal class KeyGrid @JvmOverloads constructor(val centres: Map<Char, KeyPoint
 internal class SpatialDecoder(val model: TypingModel) {
     /** Your own words (`PersonalWords`), read beside the model's; null or empty without any. */
     @Volatile var personal: PersonalWords? = null
+    /** Keyboard › Stronger autocorrect: two edits for longer words, and a spelling that is no word at all priced
+     * higher ([STRONG_UNKNOWN_COST]), so sloppier typing still corrects. Off reads exactly as before. */
+    @Volatile var strong = false
     /** Keyboard › Swipe typing's reader for this language, made at the first swipe. */
     val swipe by lazy { SwipeReader(this) }
     /** `spaceCost`: what reading this tap as a space the finger missed costs when it landed on
@@ -186,6 +189,10 @@ internal class SpatialDecoder(val model: TypingModel) {
         return found.map { Found(it.key, it.value) }
     }
 
+    // How many edits (a letter added, dropped or two swapped) a typed word may be from a reading: one, and with
+    // [strong] two from [TWO_EDITS_FROM] letters on, so a long word with two slips ("kehbaodd") still reads as meant.
+    private fun edits(length: Int) = if (strong && length >= TWO_EDITS_FROM) 2 else 1
+
     fun decide(typed: String, taps: List<Tap>, previous: Int, swears: Boolean): Decision {
         val none = Decision(null, emptyList())
         if (typed.length !in 2..32 || taps.size != typed.length || model.neverSuggest.blocks(typed, swears, previous) ||
@@ -200,7 +207,7 @@ internal class SpatialDecoder(val model: TypingModel) {
             literal >= 0 -> model.languageCost(previous, literal)
             listed != null -> listed
             knownLiteral -> 15.0
-            else -> 22.0
+            else -> if (strong) STRONG_UNKNOWN_COST else 22.0
         }
         // One of your own words scores as a moderately common one (about the 10,000th).
         if (yours >= 0) lm = minOf(lm, USER_WORD_COST)
@@ -209,9 +216,9 @@ internal class SpatialDecoder(val model: TypingModel) {
         if (!cost.isFinite()) return none
         val readings = ArrayList<Reading>()
         // iOS applies the language score only to the five best spatial readings.
-        for ((w, spatial) in search(taps, 0, taps.size, 1, swears, previous).sortedWith(spatialOrder).take(5)) if (w != literal)
+        for ((w, spatial) in search(taps, 0, taps.size, edits(typed.length), swears, previous).sortedWith(spatialOrder).take(5)) if (w != literal)
             readings.add(Reading(model.text(w), spatial + lmWeight * model.languageCost(previous, w), model.frequencyCost(w)))
-        if (personal != null) for ((w, spatial) in search(taps, 0, taps.size, 1, swears, previous, personal).sortedWith(spatialOrder).take(3))
+        if (personal != null) for ((w, spatial) in search(taps, 0, taps.size, edits(typed.length), swears, previous, personal).sortedWith(spatialOrder).take(3))
             if (w != yours) readings.add(Reading(personal.text(w), spatial + lmWeight * USER_WORD_COST, (USER_WORD_COST * 8).toInt()))
         if (taps.size >= 3) {
             fun alone(f: Found) = model.length(f.word) > 1 || model.frequencyCost(f.word) < 56
@@ -292,7 +299,7 @@ internal class SpatialDecoder(val model: TypingModel) {
             literal >= 0 -> model.languageCost(previous, literal)
             listed != null -> listed
             knownLiteral -> 15.0
-            else -> 22.0
+            else -> if (strong) STRONG_UNKNOWN_COST else 22.0
         }
         if (yours >= 0) lm = minOf(lm, USER_WORD_COST)
         var cost = lmWeight * lm
@@ -311,7 +318,7 @@ internal class SpatialDecoder(val model: TypingModel) {
         if (codes.any { it == 0 }) return false
         // One alignment the search also tries usually clears it already: no search then.
         aligned(codes, taps)?.let { if (cost - (it + lmWeight * readingLm) >= margin) return true }
-        val spatial = search(taps, 0, taps.size, 1, swears, previous, OneWord(codes)).firstOrNull()?.cost ?: return false
+        val spatial = search(taps, 0, taps.size, edits(typed.length), swears, previous, OneWord(codes)).firstOrNull()?.cost ?: return false
         return cost - (spatial + lmWeight * readingLm) >= margin
     }
 
@@ -445,6 +452,8 @@ internal class SpatialDecoder(val model: TypingModel) {
     private companion object {
         val spatialOrder = compareBy<Found> { it.cost }.thenBy { it.word }
         const val EDIT_COST = 7.0
+        const val TWO_EDITS_FROM = 6
+        const val STRONG_UNKNOWN_COST = 30.0
         const val MAX_TAP_COST = 9.0
         // An accented letter typed as its base letter's key (é from e).
         const val ACCENT_COST = 1.0
