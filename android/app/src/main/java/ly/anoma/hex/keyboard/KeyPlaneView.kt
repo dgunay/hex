@@ -1025,6 +1025,8 @@ internal class KeyPlaneView(context: Context, private val ime: HexKeyboard, priv
         return KeyRect(spaceKey.left + spaceKey.paddingLeft.toDouble(), top, spaceKey.right - spaceKey.paddingRight.toDouble(),
             top + spaceKey.height - spaceKey.paddingTop - spaceKey.paddingBottom)
     }
+    /** The letter keys' grid as typing reads it, or null before the letters are laid out. */
+    fun letterGrid() = geometry()
     private fun geometry(): KeyGrid? {
         grid?.let { return it }
         // The pitch from the layout's own first two keys and the row under them: on AZERTY, q, w and a sit on

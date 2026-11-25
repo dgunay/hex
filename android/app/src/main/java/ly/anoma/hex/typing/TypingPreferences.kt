@@ -53,6 +53,10 @@ internal class TypingPreferences(context: Context) {
     var snugBottom: Boolean
         get() = prefs.getBoolean(SNUG_BOTTOM, false)
         set(value) { prefs.edit().putBoolean(SNUG_BOTTOM, value).apply() }
+    /** Keyboard › Fix earlier words: going back into a word offers other words for it. Off by default. */
+    var fixEarlierWords: Boolean
+        get() = prefs.getBoolean("fixEarlierWords", false)
+        set(value) { prefs.edit().putBoolean("fixEarlierWords", value).apply() }
     /** Labs › Keyboard › Local currency: the phone's own currency on the ?123 page and d's held symbol
      * instead of $. Off by default. */
     var localCurrency: Boolean

@@ -66,6 +66,7 @@ internal class KeyboardView(context: Context, private val ime: HexKeyboard) : Li
     override fun shown(slots: List<Suggestion?>) = strip.suggestions(slots)
     override fun undoDictation(shown: Boolean) = strip.undo(shown)
     override fun toolsChanged() = strip.update()
+    override fun keyGrid() = keys.letterGrid()
     fun notice(notice: StripNotice?) = strip.notice(notice)
     /** The strip's notice showing now, if any. */
     val shownNotice get() = strip.shownNotice

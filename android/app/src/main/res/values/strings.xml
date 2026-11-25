@@ -202,6 +202,8 @@
     <string name="letter_symbols_detail">Hold a letter to type a symbol, like m for ?</string>
     <string name="number_row">Number row</string>
     <string name="number_row_detail">Shows 1–0 above the letters</string>
+    <string name="fix_earlier_words">Fix earlier words</string>
+    <string name="fix_earlier_words_detail">Go back into a word to see what else it could be, and what you first typed</string>
     <string name="snug_bottom">Keys down to the bar</string>
     <string name="snug_bottom_detail">No gap under the bottom row</string>
     <string name="local_currency">Local currency</string>
