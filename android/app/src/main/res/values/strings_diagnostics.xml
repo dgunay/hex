@@ -32,6 +32,8 @@
     <string name="diagnostics_tap_end">Dictation end</string>
     <string name="diagnostics_tap_click">click</string>
     <string name="diagnostics_tap_tick">tick</string>
+    <string name="diagnostics_tap_word">Word deleted</string>
+    <string name="diagnostics_tap_heavy_click">heavy click</string>
     <string name="diagnostics_tap_predefined" formatted="false">%1$s: Android’s %2$s</string>
     <string name="diagnostics_tap_pulse" formatted="false">%1$s: a %2$d ms pulse %3$s, because this phone doesn’t offer Android’s %4$s</string>
     <string name="diagnostics_tap_default_strength">at the phone’s default strength</string>

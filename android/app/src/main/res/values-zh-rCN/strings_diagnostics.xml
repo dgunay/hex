@@ -28,6 +28,8 @@
     <string name="diagnostics_tap_end">听写结束</string>
     <string name="diagnostics_tap_click">点击</string>
     <string name="diagnostics_tap_tick">轻触</string>
+    <string name="diagnostics_tap_word">删除整词</string>
+    <string name="diagnostics_tap_heavy_click">重击</string>
     <string name="diagnostics_tap_predefined" formatted="false">%1$s：Android 的%2$s效果</string>
     <string name="diagnostics_tap_pulse" formatted="false">%1$s：以%3$s振动 %2$d 毫秒，因为这台手机不提供 Android 的%4$s效果</string>
     <string name="diagnostics_tap_default_strength">手机默认强度</string>

@@ -119,9 +119,9 @@ internal object KeyboardMetrics {
     /** Keyboard › Hold delete for words: past [DELETE_REPEAT_DELAY] a held delete takes whole words instead
      * of letters, the first [DELETE_WORD_FIRST] ms apart, each gap [DELETE_WORD_SPEEDUP] of the last, down to
      * [DELETE_WORD_FASTEST] ms (SwiftKey: "the longer you hold it, the faster it deletes"). */
-    const val DELETE_WORD_FIRST = 200L
-    const val DELETE_WORD_SPEEDUP = 0.85
-    const val DELETE_WORD_FASTEST = 80L
+    const val DELETE_WORD_FIRST = 600L
+    const val DELETE_WORD_SPEEDUP = 0.8
+    const val DELETE_WORD_FASTEST = 90L
     /** A key held this long shows what it holds (Gboard's long press: between 300 and 350 ms). */
     const val HOLD_MS = 300L
     /** Gboard's pads: 53.3 dp keys on the letters' 58.9 dp rows (a 5.7 dp gap between rows). */
