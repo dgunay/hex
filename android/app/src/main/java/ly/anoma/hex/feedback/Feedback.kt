@@ -34,7 +34,8 @@ import ly.anoma.hex.speech.SpeechPreferences
  * offered only in a build with a report key (Gradle property hexFeedbackKey, surfaced as BuildConfig.FEEDBACK_KEY). */
 internal object Feedback {
     private const val TAG = "HexFeedback"
-    val available get() = BuildConfig.FEEDBACK_KEY.isNotEmpty()
+    // dgunay/hex: this fork's builds never send to upstream's feedback service, which wouldn't know its changes.
+    val available get() = false
     /** Debug builds only, from the launch intent: the first answer is lost, to show a retry gets the same issue. */
     var dropFirstResponse = false
 
