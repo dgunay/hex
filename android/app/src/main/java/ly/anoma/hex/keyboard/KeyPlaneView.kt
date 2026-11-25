@@ -152,17 +152,16 @@ internal class KeyPlaneView(context: Context, private val ime: HexKeyboard, priv
     private var swipe: KeyboardEngine.SwipeContext? = null
     private val trail = SwipeTrail(this, (ink and 0xFFFFFF) or ((if (ink.isLight()) 0x80 else 0x66) shl 24), 6 * density)
     private val preview = SwipePreview { post(it) }
-    // A held delete repeats letters; with Keyboard › Hold delete for words on, after a few it takes whole
-    // words, sooner each time. [repeats] counts this hold's repeats, [wordGap] is the next word's wait.
-    private var repeats = 0
+    // A held delete repeats letters. With Keyboard › Hold delete for words on, it takes no letters: past
+    // the hold threshold it takes whole words, sooner each time, as SwiftKey's does ([wordGap] is the next
+    // word's wait). Where a word can't be read (a password field), it repeats letters as before.
     private var wordGap = KeyboardMetrics.DELETE_WORD_FIRST
     private val repeatDelete = object : Runnable {
         override fun run() {
             if (!deleting) return
             repeated = true
-            val words = ime.feedback.holdDeleteWords && repeats >= KeyboardMetrics.DELETE_LETTERS_BEFORE_WORDS
-            repeats++
-            if (words && ime.engine.deleteWord()) {
+            if (ime.feedback.holdDeleteWords && ime.engine.deleteWord()) {
+                tap(context, ime.feedback.haptics, Tap.Word)
                 postDelayed(this, wordGap)
                 wordGap = maxOf(KeyboardMetrics.DELETE_WORD_FASTEST, (wordGap * KeyboardMetrics.DELETE_WORD_SPEEDUP).toLong())
             } else {
@@ -589,7 +588,7 @@ internal class KeyPlaneView(context: Context, private val ime: HexKeyboard, priv
                 MotionEvent.ACTION_DOWN -> {
                     roll.down(v) { lift(typing = true) }
                     repeated = false; deleting = true; v.isPressed = true; deleteSlide = null
-                    repeats = 0; wordGap = KeyboardMetrics.DELETE_WORD_FIRST
+                    wordGap = KeyboardMetrics.DELETE_WORD_FIRST
                     deleteGesture.down(e.x)
                     postDelayed(repeatDelete, KeyboardMetrics.DELETE_REPEAT_DELAY)
                 }

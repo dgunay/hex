@@ -201,7 +201,7 @@
     <string name="number_row">Number row</string>
     <string name="number_row_detail">Shows 1–0 above the letters</string>
     <string name="hold_delete_words">Hold delete for words</string>
-    <string name="hold_delete_words_detail">Held, delete takes letters, then whole words</string>
+    <string name="hold_delete_words_detail">Held, delete takes whole words</string>
     <string name="snug_bottom">Keys down to the bar</string>
     <string name="snug_bottom_detail">No gap under the bottom row</string>
     <string name="local_currency">Local currency</string>

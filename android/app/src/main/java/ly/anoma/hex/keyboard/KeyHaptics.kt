@@ -22,7 +22,10 @@ internal enum class Tap(private val predefined: Int, private val primitive: Int,
     /** Dictation starting: a click. */
     Start(VibrationEffect.EFFECT_CLICK, VibrationEffect.Composition.PRIMITIVE_CLICK, 20),
     /** Dictation ending (done, cancelled or failed): a tick. */
-    End(VibrationEffect.EFFECT_TICK, VibrationEffect.Composition.PRIMITIVE_TICK, 12);
+    End(VibrationEffect.EFFECT_TICK, VibrationEffect.Composition.PRIMITIVE_TICK, 12),
+    /** A whole word going while delete is held (Keyboard › Hold delete for words): a heavy click. Below full
+     * strength it scales the plain click, as Composition has no heavy primitive. */
+    Word(VibrationEffect.EFFECT_HEAVY_CLICK, VibrationEffect.Composition.PRIMITIVE_CLICK, 30);
 
     /** This tap at [strength] (0–1, Keyboard › Haptic strength). Full strength is [effect]; below it, the
      * same click or tick as a scaled composition primitive where the vibrator has one, else a pulse at that

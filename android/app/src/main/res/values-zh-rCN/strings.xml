@@ -176,7 +176,7 @@
     <string name="number_row">数字行</string>
     <string name="number_row_detail">在字母上方显示 1–0</string>
     <string name="hold_delete_words">长按删除整词</string>
-    <string name="hold_delete_words_detail">长按删除键先删字母，再删整个词</string>
+    <string name="hold_delete_words_detail">长按删除键删除整个词</string>
     <string name="haptic_strength">振动强度</string>
     <string name="snug_bottom">按键贴底</string>
     <string name="snug_bottom_detail">底排按键下方不留空隙</string>
