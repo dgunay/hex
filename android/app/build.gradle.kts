@@ -12,6 +12,18 @@ plugins {
 }
 
 // Resolved at build time only. A clean install works with airplane mode on.
+// The fork's own build line on Settings' main page: the branch and commit this build came from, read from the
+// repository's .git without running git (the build container has none).
+val forkCommit: Pair<String, String> = run {
+    val git = rootDir.parentFile.resolve(".git")
+    val head = git.resolve("HEAD").takeIf { it.isFile }?.readText()?.trim() ?: return@run "" to "unknown"
+    if (!head.startsWith("ref: ")) return@run "" to head.take(8)
+    val ref = head.removePrefix("ref: ")
+    val sha = git.resolve(ref).takeIf { it.isFile }?.readText()?.trim()
+        ?: git.resolve("packed-refs").takeIf { it.isFile }?.readLines()?.firstOrNull { it.endsWith(" $ref") }?.substringBefore(' ')
+        ?: "unknown"
+    ref.removePrefix("refs/heads/") to sha.take(8)
+}
 val modelAssets = layout.buildDirectory.dir("generated/whisper/assets")
 val modelRevision = "5359861c739e955e79d9a303bcbc70fb988958b1"
 val modelSha256 = "818710568da3ca15689e31a743197b520007872ff9576237bda97bd1b469c3d7"
@@ -96,6 +108,8 @@ android {
         versionCode = 6
         versionName = "0.2.3"
         buildConfigField("String", "FEEDBACK_KEY", "\"$feedbackKey\"")
+        buildConfigField("String", "FORK_BRANCH", "\"${forkCommit.first}\"")
+        buildConfigField("String", "FORK_COMMIT", "\"${forkCommit.second}\"")
         // Labs › Diagnostics: Hex Preview and debug builds (below), never the Play release.
         buildConfigField("boolean", "DIAGNOSTICS", "false")
         ndk { abiFilters += "arm64-v8a" }
