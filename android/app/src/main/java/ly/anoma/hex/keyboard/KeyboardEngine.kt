@@ -716,6 +716,16 @@ internal class KeyboardEngine(
         adaptive?.forget(); resetTyping(); clearSpaces(); surface?.suggestions(emptyList())
         return DeleteSlide(target, selStart, target.before(2000).orEmpty())
     }
+    /** A held delete's whole-word step (Keyboard › Hold delete for words): the word before the cursor goes,
+     * with the spaces and punctuation after it, as a delete slide's words do. False where words can't be
+     * read (a password or TYPE_NULL field, a selection, no known cursor): the hold goes on letter by letter. */
+    fun deleteWord(): Boolean {
+        if (secure || keyEventEditor || selStart < 0 || selStart != selEnd || !target.connected) return false
+        val length = DeleteSlide.wordLengths(target.before(200).orEmpty()).firstOrNull() ?: return false
+        tracker.keyboardRemoved()
+        edited(); adaptive?.forget(); clearSpaces(); undo = null; resetTyping(); surface?.suggestions(emptyList())
+        return target.deleteBefore(length)
+    }
     /** The delete slide lifted with words selected: they go. */
     fun deleteSelection() {
         if (!target.connected) return

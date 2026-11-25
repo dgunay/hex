@@ -47,6 +47,11 @@ internal class TypingPreferences(context: Context) {
     var snugBottom: Boolean
         get() = prefs.getBoolean(SNUG_BOTTOM, false)
         set(value) { prefs.edit().putBoolean(SNUG_BOTTOM, value).apply() }
+    /** Keyboard › Hold delete for words: a held delete takes letters, then whole words, faster the longer
+     * it is held (as SwiftKey's does). Off by default: held, delete repeats letters as Gboard's does. */
+    var holdDeleteWords: Boolean
+        get() = prefs.getBoolean("holdDeleteWords", false)
+        set(value) { prefs.edit().putBoolean("holdDeleteWords", value).apply() }
     /** Labs › Keyboard › Local currency: the phone's own currency on the ?123 page and d's held symbol
      * instead of $. Off by default. */
     var localCurrency: Boolean
