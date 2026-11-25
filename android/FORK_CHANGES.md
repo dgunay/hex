@@ -70,8 +70,8 @@ Each setting's commits still use the names it had when it was added. Commit hash
   - A spelling that is no word at all costs 30 nats (`STRONG_UNKNOWN_COST`) instead of 22, so a real word a
     little further away can beat it.
 - **Limits:** more unusual words are changed too. For example, "tailscale" becomes "tail scale" and "gunay"
-  becomes "Gun at", because a spelling the model doesn't know is now cheaper to replace. SwiftKey avoids this in
-  practice by learning words you keep (see *Next* below).
+  becomes "Gun at", because a spelling the model doesn't know is now cheaper to replace. Learn new words (below)
+  fixes this for words you keep.
 - **Commit:** `89c7797a` Android Keyboard: Stronger autocorrect corrects sloppier typing.
 
 ### A clause mark takes autocorrect's space
@@ -115,6 +115,38 @@ Each setting's commits still use the names it had when it was added. Commit hash
   - It never shows in password fields, `TYPE_NULL` editors, number pads, or while symbols show.
   - Splits and joins ("deli ate" → "delicate") aren't remembered, since they change more than one word.
 - **Commit:** `9446017d` Android Keyboard: Fix earlier words offers other words for one you go back to.
+
+### Learn new words
+
+- **Switch:** Settings › Keyboard › Learn new words (off).
+- **What:** as SwiftKey does, a word you keep the way you typed it joins your personal dictionary, so autocorrect
+  leaves it alone and suggests it from then on. You keep a word by:
+  - tapping your own spelling (in quotes) in the suggestion strip,
+  - undoing an autocorrection of it, with Delete or the Undo tool, or
+  - choosing what you first typed in Fix earlier words.
+
+  The strip then says `Added “gunay” to your dictionary. Tap to remove`. Long-pressing one of your dictionary's
+  words in the strip offers `Tap to remove “gunay” from your dictionary`.
+- **Why:** upstream reads Android's personal dictionary but never adds to it. A name or product the model doesn't
+  know ("gunay", "tailscale") is "corrected" every time until it's added by hand in Android's settings, and
+  Stronger autocorrect splits such words more readily. Once a word is in the dictionary, both leave it alone.
+- **How:**
+  - `LearnedWords.learnable`: only a spelling no dictionary knows. It must be 2–32 characters, start and end with a
+    letter, and contain only letters, apostrophes and hyphens. It must not be the model's word (`index`/`known`)
+    or already yours.
+  - `LearnedWords.spelling`: a capital that only the start of a sentence gave the word isn't kept ("Tailscale is…"
+    is saved as "tailscale"). Capitals inside a word ("iPhone") or mid-sentence ("Gunay") are kept.
+  - It's written with `UserDictionary.Words.addWord` (frequency 250, as Android's own Add uses) under the
+    language's locale, off the main thread. A keyboard that's the current input method may write the dictionary
+    without a permission.
+  - Upstream's existing content observer reloads every model's personal words when the dictionary changes.
+  - Removing deletes the dictionary rows with that word (`word = ? COLLATE NOCASE`).
+- **Limits:**
+  - Never in password fields, or fields that ask not to be learned from (incognito).
+  - A word you simply type and keep, without tapping it or undoing a fix, isn't learned. Hex keeps no record of
+    what you type, so it can't count repeats the way SwiftKey does.
+  - Words go into Android's shared personal dictionary, so other keyboards and spell checkers see them too.
+- **Commit:** Android Keyboard: Learn new words, as SwiftKey learns them.
 
 ## Dictation from another keyboard
 
@@ -171,12 +203,3 @@ Each setting's commits still use the names it had when it was added. Commit hash
   - `e9fc2c44` Android Keyboard: Hex's speech window takes input focus. An intermediate step, replaced by the next
     commit.
   - `f06fc06f` Android Keyboard: SwiftKey types Hex's dictation on Android 17.
-
-## Next
-
-Planned, not built yet:
-
-- **Learning words you keep, SwiftKey-style.** Keeping or tapping your own spelling of an unknown word in the
-  strip ("gunay") teaches it, and long-pressing a suggestion removes it. Upstream reads Android's personal
-  dictionary but never adds to it, so an unknown word is "corrected" every time until it's added by hand in
-  Settings. This should also fix most of Stronger autocorrect's unwanted splits.

@@ -159,6 +159,8 @@ internal class StripView(context: Context, private val ime: HexKeyboard, private
             slotViews[i].apply {
                 isFocusable = true
                 setOnClickListener { offered[i]?.let(ime.engine::pickSuggestion) }
+                // Keyboard › Learn new words: a long press on one of your own words offers to remove it.
+                setOnLongClickListener { offered[i]?.takeIf(ime.engine::ownsWord)?.let { ime.offerForget(it); true } ?: false }
                 addView(words[i], LayoutParams(LayoutParams.WRAP_CONTENT, dp(30), Gravity.CENTER))
             }
             slotRow.addView(slotViews[i], LinearLayout.LayoutParams(0, -1, 1f))

@@ -16,6 +16,7 @@ import ly.anoma.hex.typing.AdaptiveTouch
 import ly.anoma.hex.typing.Correction
 import ly.anoma.hex.typing.KeyGrid
 import ly.anoma.hex.typing.KeyPoint
+import ly.anoma.hex.typing.LearnedWords
 import ly.anoma.hex.typing.PersonalWords
 import ly.anoma.hex.typing.SmartQuotes
 import ly.anoma.hex.typing.SpatialDecoder
@@ -84,6 +85,8 @@ internal class KeyboardEngine(
     private val emoji: EmojiWords? = null,
     /** A swipe that can't be read ([swipeUnreadable]) went down: the strip says why, the first time in a field. */
     private val swipeUnavailable: () -> Unit = {},
+    /** Keyboard › Learn new words: a word you kept as typed, and its language, for Android's personal dictionary. */
+    private val learnWord: ((String, String) -> Unit)? = null,
     private val clock: () -> Long = { SystemClock.uptimeMillis() },
     private val main: Handler = Handler(Looper.getMainLooper()),
     /** Labs › Learn from my fixes: what became of a tracked dictation. Null reports nothing; the tracker
@@ -538,6 +541,8 @@ internal class KeyboardEngine(
                 w.replacement() != null, before = before())
         }
         if (replace(old, if (holds) committed else "$committed ")) {
+            // Your own spelling, tapped over what the strip offered for it.
+            if (old.isNotEmpty() && text == old) learn(old, w.decoder, before().dropLast(old.length + if (holds) 0 else 1))
             resetTyping()
             val b = before()
             if (holds) heldAnchor = b else pickedAnchor = b
@@ -827,6 +832,17 @@ internal class KeyboardEngine(
         if (!revert(last)) { surface?.toolsChanged(); return }
         surface?.suggestions(listOf(Suggestion(last.original.substringAfterLast(' '), Suggestion.Kind.Typed)))
     }
+    /** Keyboard › Learn new words: [typed], kept over what the keyboard offered or made of it, joins your personal
+     * dictionary when no dictionary knows it ([LearnedWords]). Never in a password field or one that asks not to be
+     * learned from. */
+    private fun learn(typed: String, decoder: SpatialDecoder, textBefore: String) {
+        if (!feedback.learnWords || secure || !learnsTyping || !LearnedWords.learnable(typed, decoder)) return
+        learnWord?.invoke(LearnedWords.spelling(typed, textBefore), decoder.model.language)
+    }
+    /** Whether [text], a word the strip offers, is one of your personal dictionary's, which a long press can remove
+     * (Keyboard › Learn new words). */
+    fun ownsWord(text: String) = feedback.learnWords && word?.decoder?.personal?.owns(text) == true
+
     /** Puts back what an autocorrection replaced, with its space, if it is still right before the cursor. */
     private fun revert(last: Undo): Boolean {
         if (!endsWith(last.replacement + " ") || !replace(last.replacement + " ", last.original)) return false
@@ -836,6 +852,8 @@ internal class KeyboardEngine(
         teacher?.undone(last.original)
         val typed = last.original.substringAfterLast(' ')
         prefix = before().dropLast(typed.length).takeLast(40); word?.restored(typed, prefix)
+        // What you typed, taken back from autocorrect.
+        if (' ' !in last.original) word?.decoder?.takeIf { it.model.language == last.language }?.let { learn(typed, it, before().dropLast(typed.length)) }
         if (expectedCaret >= 0) expectedCaret += last.original.length - last.replacement.length - 1
         return true
     }
@@ -1055,6 +1073,7 @@ internal class KeyboardEngine(
             if (target.setSelection(e.cursor - w.head.length, e.cursor + w.tail.length)) target.commit(smartWord(text))
         } finally { target.endBatch() }
         if (text == e.typed && learnsTyping) feedback.undo(e.language, e.typed, w.text)
+        if (text == e.typed) word?.decoder?.takeIf { it.model.language == e.language }?.let { learn(text, it, e.word.before) }
         return true
     }
 }

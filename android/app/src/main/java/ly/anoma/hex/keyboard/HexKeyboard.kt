@@ -129,7 +129,7 @@ class HexKeyboard : InputMethodService() {
             emoji = EmojiWords(assets, words),
             learned = { if (preferences.learnFixes) fixes.record(it) },
             adaptiveTouch = { if (feedback.adaptiveTouch) AdaptiveTouchStore.get(this) else null },
-            swipeUnavailable = ::swipeUnavailable)
+            swipeUnavailable = ::swipeUnavailable, learnWord = ::learnWord)
     }
     private val typingChanged = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
         if (key == TypingPreferences.SUGGEST_SWEAR_WORDS) engine.swearWordsChanged()
@@ -469,6 +469,27 @@ class HexKeyboard : InputMethodService() {
         view?.notice(StripNotice(getString(R.string.keyboard_note_swipe, language), getString(R.string.keyboard_note_dismiss),
             tap = {}, dismiss = {}))
     }
+    /** Keyboard › Learn new words: [word] goes into Android's personal dictionary for [language], and the strip says
+     * so; tapping that note takes it out again. The dictionary's change reloads every model's words. */
+    private fun learnWord(word: String, language: String) {
+        words.execute { runCatching { UserDictionary.Words.addWord(this, word, LEARNED_FREQUENCY, null, java.util.Locale.forLanguageTag(language)) } }
+        // After the strip shows what this tap or undo left, which would clear a notice set before it.
+        Handler(Looper.getMainLooper()).post {
+            view?.notice(StripNotice(getString(R.string.keyboard_word_learned, word), getString(R.string.keyboard_note_dismiss),
+                tap = { forgetWord(word) }, dismiss = {}))
+        }
+    }
+    /** A long press on one of your words in the strip: the strip offers to take it out of your personal dictionary. */
+    internal fun offerForget(word: String) {
+        view?.notice(StripNotice(getString(R.string.keyboard_word_forget, word), getString(R.string.keyboard_note_dismiss),
+            tap = { forgetWord(word) }, dismiss = {}))
+    }
+    private fun forgetWord(word: String) {
+        words.execute {
+            runCatching { contentResolver.delete(UserDictionary.Words.CONTENT_URI, "${UserDictionary.Words.WORD} = ? COLLATE NOCASE", arrayOf(word)) }
+        }
+    }
+
     internal fun beginSpeech(): Boolean {
         if (engine.secure || currentInputConnection == null || !capture.canStart ||
             checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
@@ -674,6 +695,8 @@ class HexKeyboard : InputMethodService() {
     private companion object {
         /** A failed voice-only dictation's note stays this long before the keyboard comes back. */
         const val VOICE_NOTE_MS = 1_200L
+        /** A learned word's frequency in the personal dictionary (Android's own Add uses 250). */
+        const val LEARNED_FREQUENCY = 250
         /** How long a dictation whose field went away waits, in memory only, to be offered. */
         const val KEPT_MS = 120_000L
     }

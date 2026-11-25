@@ -212,6 +212,7 @@ internal fun HexSettings(setup: Setup, speech: SpeechPreferences, typing: Typing
     val deleteWordFirst = remember(revision) { typing.deleteWordFirst }
     val deleteWordSpeedup = remember(revision) { typing.deleteWordSpeedup }
     val fixEarlierWords = remember(revision) { typing.fixEarlierWords }
+    val learnWords = remember(revision) { typing.learnWords }
     val localCurrency = remember(revision) { typing.localCurrency }
     var copied by remember(transcript) { mutableStateOf(false) }
     fun open(next: Page) {
@@ -402,6 +403,7 @@ internal fun HexSettings(setup: Setup, speech: SpeechPreferences, typing: Typing
                             if (autocorrect) { Rule(); Toggle(stringResource(R.string.settings_spatial), stringResource(R.string.settings_spatial_detail), spatial) { typing.spatial = it } }
                             if (autocorrect) { Rule(); Toggle(stringResource(R.string.strong_autocorrect), stringResource(R.string.strong_autocorrect_detail), strongAutocorrect) { typing.strongAutocorrect = it } }
                             Rule(); Toggle(stringResource(R.string.fix_earlier_words), stringResource(R.string.fix_earlier_words_detail), fixEarlierWords) { typing.fixEarlierWords = it }
+                            Rule(); Toggle(stringResource(R.string.learn_words), stringResource(R.string.learn_words_detail), learnWords) { typing.learnWords = it }
                             Rule(); Toggle(stringResource(R.string.settings_swipe), stringResource(R.string.settings_swipe_detail), swipe) { typing.swipe = it }
                             Rule(); Toggle(stringResource(R.string.settings_swear_words), stringResource(R.string.settings_swear_words_detail), swearWords) { typing.suggestSwearWords = it }
                             // The words the keyboard keeps and suggests are Android's own personal dictionary.

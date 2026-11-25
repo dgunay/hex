@@ -57,6 +57,10 @@ internal class TypingPreferences(context: Context) {
     var fixEarlierWords: Boolean
         get() = prefs.getBoolean("fixEarlierWords", false)
         set(value) { prefs.edit().putBoolean("fixEarlierWords", value).apply() }
+    /** Keyboard › Learn new words: a word you keep as typed joins Android's personal dictionary (LearnedWords). */
+    var learnWords: Boolean
+        get() = prefs.getBoolean("learnWords", false)
+        set(value) { prefs.edit().putBoolean("learnWords", value).apply() }
     var holdDeleteWords: Boolean
         get() = prefs.getBoolean("holdDeleteWords", false)
         set(value) { prefs.edit().putBoolean("holdDeleteWords", value).apply() }
