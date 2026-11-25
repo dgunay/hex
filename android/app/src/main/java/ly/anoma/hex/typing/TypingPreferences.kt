@@ -42,6 +42,11 @@ internal class TypingPreferences(context: Context) {
     var numberRow: Boolean
         get() = prefs.getBoolean(NUMBER_ROW, false)
         set(value) { prefs.edit().putBoolean(NUMBER_ROW, value).apply() }
+    /** Keyboard › Keys down to the bar: no gap under the bottom row, so the keys sit on the system's
+     * bar. Off by default (Gboard's 12.2 dp gap). */
+    var snugBottom: Boolean
+        get() = prefs.getBoolean(SNUG_BOTTOM, false)
+        set(value) { prefs.edit().putBoolean(SNUG_BOTTOM, value).apply() }
     /** Labs › Keyboard › Local currency: the phone's own currency on the ?123 page and d's held symbol
      * instead of $. Off by default. */
     var localCurrency: Boolean
@@ -146,6 +151,7 @@ internal class TypingPreferences(context: Context) {
     companion object {
         const val SUGGEST_SWEAR_WORDS = "suggestSwearWords"
         const val NUMBER_ROW = "numberRow"
+        const val SNUG_BOTTOM = "snugBottom"
         const val LOCAL_CURRENCY = "localCurrency"
         const val EMOJI_SUGGESTIONS = "emojiSuggestions"
         const val KEYBOARD_TOOLS = "keyboardTools"
