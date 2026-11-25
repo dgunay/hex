@@ -253,8 +253,9 @@
     <string name="clipboard_history_detail">Reads what you copy and keeps the last 20 texts on this phone, each for an hour unless you pin it. Skips text an app marks as sensitive. Turning it off deletes them.</string>
     <string name="password_manager_suggestions">Password manager suggestions</string>
     <string name="password_manager_suggestions_detail">Show logins, codes and cards from your autofill service in the suggestion strip</string>
+    <string name="voice_input_label">Hex dictation</string>
     <string name="voice_only_mode">Voice-only mode</string>
-    <string name="voice_only_detail">Lets you switch to Hex just to dictate from another keyboard, then switches back</string>
+    <string name="voice_only_detail">Dictate with Hex from another keyboard: its mic key, or a switch to Hex that switches back</string>
     <string name="voice_bar_from_menu">Voice bar from the Hex menu</string>
     <string name="voice_bar_from_menu_detail">Adds Voice only to the Hex menu, which folds the keys into a small dictation bar in the same field</string>
     <string name="hex_key_left">Hex key on the left</string>

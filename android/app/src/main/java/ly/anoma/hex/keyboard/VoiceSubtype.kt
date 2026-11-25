@@ -32,6 +32,7 @@ internal object VoiceOnly {
     /** The Labs toggle: registers or clears the subtype and, where Android needs a hand, enables it. */
     fun setEnabledFromSettings(context: Context, enabled: Boolean) {
         setEnabled(context, enabled)
+        ly.anoma.hex.speech.VoiceInputActivity.setEnabled(context, enabled)
         if (Build.VERSION.SDK_INT >= 34) setExplicitlyEnabled(context, enabled)
         else if (enabled) openSubtypeSettings(context)
     }

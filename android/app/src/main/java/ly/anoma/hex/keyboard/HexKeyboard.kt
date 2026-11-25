@@ -213,7 +213,7 @@ class HexKeyboard : InputMethodService() {
         capture = MicCapture(LocalSpeech(applicationContext), DictationPlace.Keyboard, update = ::showStatus, meter = ::showLevel,
             insert = ::commitSpeech)
         // The lab off is the keyboard it always was: never touch the system's subtype list for it.
-        if (feedback.voiceOnly) VoiceOnly.setEnabled(this, true)
+        if (feedback.voiceOnly) { VoiceOnly.setEnabled(this, true); ly.anoma.hex.speech.VoiceInputActivity.setEnabled(this, true) }
         clipKeeper.sync()
         ClipboardHistory.changed = { expiry.post(expire) }
         expireClips()

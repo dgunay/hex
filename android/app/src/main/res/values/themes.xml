@@ -22,6 +22,17 @@
         <item name="android:navigationBarColor">@color/keyboard</item>
         <item name="android:windowBackground">@color/keyboard</item>
     </style>
+    <!-- Labs › Keyboard › Voice-only mode's bar over the app that asked to recognise speech. -->
+    <style name="HexVoiceInput" parent="android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:fontFamily">@font/inter_variable</item>
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:backgroundDimEnabled">true</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:navigationBarColor">@color/keyboard</item>
+        <item name="android:windowLightNavigationBar">@bool/light_bars</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+    </style>
     <!-- The emoji picker's colours in Hex's flat keyboard look: ink for the chosen category, quiet icons and labels. -->
     <style name="HexEmoji" parent="HexIme">
         <item name="android:colorAccent">@color/ink</item>

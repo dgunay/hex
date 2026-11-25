@@ -225,8 +225,9 @@
     <string name="clipboard_history_detail">读取你复制的内容，并在这台手机上保留最近 20 条文字，未固定的保留一小时。跳过应用标记为敏感的内容。关闭后会全部删除。</string>
     <string name="password_manager_suggestions">密码管理器建议</string>
     <string name="password_manager_suggestions_detail">在建议栏中显示自动填充服务提供的登录信息、验证码和卡片</string>
+    <string name="voice_input_label">Hex 听写</string>
     <string name="voice_only_mode">仅语音模式</string>
-    <string name="voice_only_detail">让你从其他键盘切换到 Hex 只做听写，说完再切换回去</string>
+    <string name="voice_only_detail">在其他键盘上用 Hex 听写：点它的麦克风键，或切换到 Hex，说完再切换回去</string>
     <string name="voice_bar_from_menu">从 Hex 菜单切换到语音栏</string>
     <string name="voice_bar_from_menu_detail">在 Hex 菜单中加入“仅语音”，在同一个输入框里把按键收起为一个小听写栏</string>
     <string name="hex_key_left">Hex 键放在左侧</string>
