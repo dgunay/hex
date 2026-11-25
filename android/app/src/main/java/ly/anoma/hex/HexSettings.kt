@@ -336,6 +336,11 @@ internal fun HexSettings(setup: Setup, speech: SpeechPreferences, typing: Typing
                             if (Feedback.available) { Rule(); Entry(stringResource(R.string.feedback_send_feedback), action = ::sendFeedback) }
                         }
                         Updates.SettingsCard()
+                        // This fork's build: where it comes from and which commit, so a report can name it.
+                        Box(Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 8.dp), contentAlignment = Alignment.Center) {
+                            Label(listOf("dgunay/hex", BuildConfig.FORK_BRANCH, BuildConfig.FORK_COMMIT).filter { it.isNotEmpty() }
+                                .joinToString(" · "), muted = true, size = 13)
+                        }
                     }
                     Page.Dictation -> {
                         Card {
