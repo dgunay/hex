@@ -51,6 +51,9 @@ import ly.anoma.hex.speech.*
 import ly.anoma.hex.typing.AdaptiveTouchModel
 import ly.anoma.hex.typing.AdaptiveTouchStore
 import ly.anoma.hex.typing.TypingPreferences
+import ly.anoma.hex.keyboard.Tap
+import ly.anoma.hex.keyboard.tap
+import kotlin.math.roundToInt
 import ly.anoma.hex.updates.Updates
 import ly.anoma.hex.words.ImportedWordsRows
 import ly.anoma.hex.words.WordReplacementsPage
@@ -201,6 +204,7 @@ internal fun HexSettings(setup: Setup, speech: SpeechPreferences, typing: Typing
     val swipe = remember(revision) { typing.swipe }
     val popups = remember(revision) { typing.popups }
     val haptics = remember(revision) { typing.haptics }
+    val hapticStrength = remember(revision) { typing.hapticStrength }
     val letterSymbols = remember(revision) { typing.letterSymbols }
     val numberRow = remember(revision) { typing.numberRow }
     val snugBottom = remember(revision) { typing.snugBottom }
@@ -400,6 +404,9 @@ internal fun HexSettings(setup: Setup, speech: SpeechPreferences, typing: Typing
                                 { context.startActivity(Intent(Settings.ACTION_USER_DICTIONARY_SETTINGS)) })
                             Rule(); Toggle(stringResource(R.string.settings_popups), stringResource(R.string.settings_popups_detail), popups) { typing.popups = it }
                             Rule(); Toggle(stringResource(R.string.settings_haptics), stringResource(R.string.settings_haptics_detail), haptics) { typing.haptics = it }
+                            if (haptics) { Rule(); Strength(stringResource(R.string.haptic_strength), hapticStrength,
+                                TypingPreferences.HAPTIC_STRENGTH_MIN, change = { typing.hapticStrength = it },
+                                done = { tap(context, true, Tap.Press, it) }) }
                             Rule(); Toggle(stringResource(R.string.hold_delete_words), stringResource(R.string.hold_delete_words_detail), holdDeleteWords) { typing.holdDeleteWords = it }
                             Rule(); Toggle(stringResource(R.string.snug_bottom), stringResource(R.string.snug_bottom_detail), snugBottom) { typing.snugBottom = it }
                         }
@@ -773,6 +780,23 @@ private fun reflow(lines: List<String>) = buildString {
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         RowTitle(title, note, noteLines, titleLines)
         if (action != null && value.isNotEmpty()) Label(value, muted = true, size = if (value == "›") 22 else 15)
+    }
+}
+/** A percentage slider in a settings card ([min]–100, in steps of 10): [change] as it moves, [done] once
+ * the finger lifts (to preview the value). Hex's own colours, Material's slider for touch and TalkBack. */
+@Composable internal fun Strength(title: String, value: Int, min: Int, change: (Int) -> Unit, done: (Int) -> Unit) {
+    var shown by remember(value) { mutableIntStateOf(value) }
+    Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 4.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.weight(1f)) { Label(title, weight = FontWeight.Medium) }
+            Label("$shown%", muted = true, size = 15)
+        }
+        androidx.compose.material3.Slider(value = shown.toFloat(), valueRange = min.toFloat()..100f,
+            steps = (100 - min) / 10 - 1,
+            onValueChange = { shown = it.roundToInt(); change(shown) }, onValueChangeFinished = { done(shown) },
+            colors = androidx.compose.material3.SliderDefaults.colors(thumbColor = colorResource(R.color.ink),
+                activeTrackColor = colorResource(R.color.ink), inactiveTrackColor = colorResource(R.color.modifier),
+                activeTickColor = colorResource(R.color.modifier), inactiveTickColor = colorResource(R.color.ink)))
     }
 }
 @Composable internal fun Toggle(title: String, note: String?, on: Boolean, enabled: Boolean = true, noteLines: Int = 2,

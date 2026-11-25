@@ -34,6 +34,11 @@ internal class TypingPreferences(context: Context) {
     var haptics: Boolean
         get() = prefs.getBoolean("haptics", true)
         set(value) { prefs.edit().putBoolean("haptics", value).apply() }
+    /** Keyboard › Haptic strength, in percent (10–100). 100, the default, plays the phone's own click and tick
+     * as before; lower scales them down where the vibrator can. */
+    var hapticStrength: Int
+        get() = prefs.getInt(HAPTIC_STRENGTH, 100).coerceIn(HAPTIC_STRENGTH_MIN, 100)
+        set(value) { prefs.edit().putInt(HAPTIC_STRENGTH, value.coerceIn(HAPTIC_STRENGTH_MIN, 100)).apply() }
     /** Labs › Keyboard › Symbols on letter keys: a held second or third row key offers its symbol first. */
     var letterSymbols: Boolean
         get() = prefs.getBoolean("letterSymbols", false)
@@ -156,6 +161,8 @@ internal class TypingPreferences(context: Context) {
     companion object {
         const val SUGGEST_SWEAR_WORDS = "suggestSwearWords"
         const val NUMBER_ROW = "numberRow"
+        const val HAPTIC_STRENGTH = "hapticStrength"
+        const val HAPTIC_STRENGTH_MIN = 10
         const val SNUG_BOTTOM = "snugBottom"
         const val LOCAL_CURRENCY = "localCurrency"
         const val EMOJI_SUGGESTIONS = "emojiSuggestions"
