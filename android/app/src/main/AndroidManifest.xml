@@ -53,7 +53,7 @@
              mic key): disabled until the lab turns it on (speech/VoiceInputActivity.kt). -->
         <activity android:name=".speech.VoiceInputActivity" android:exported="true" android:enabled="false"
             android:theme="@style/HexVoiceInput" android:excludeFromRecents="true" android:taskAffinity=""
-            android:label="@string/voice_input_label" android:windowSoftInputMode="stateAlwaysHidden">
+            android:label="@string/voice_input_label" android:windowSoftInputMode="stateUnchanged">
             <intent-filter>
                 <action android:name="android.speech.action.RECOGNIZE_SPEECH" />
                 <category android:name="android.intent.category.DEFAULT" />

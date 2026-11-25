@@ -9,6 +9,9 @@ import android.content.pm.PackageManager
 import android.os.Bundle
 import android.speech.RecognizerIntent
 import android.view.Gravity
+import android.view.View
+import android.view.WindowInsets
+import android.view.WindowManager
 import android.widget.FrameLayout
 import ly.anoma.hex.R
 import ly.anoma.hex.keyboard.VoiceBarView
@@ -18,9 +21,7 @@ import ly.anoma.hex.keyboard.speechNote
  * Labs › Keyboard › Voice-only mode, for keyboards and apps that ask Android to recognise speech
  * ([RecognizerIntent.ACTION_RECOGNIZE_SPEECH]) rather than switch to a voice keyboard: SwiftKey's mic key, with
  * Google Voice Typing off, does. Hex's dictation bar over the app, recording at once; ✓ hands the text back as the
- * request's result, ✕ or leaving hands back nothing. The keyboard that asked types the text only once the app's field
- * connects to it again, and SwiftKey can't read some apps' fields at that moment (the Claude app; Discord unfocuses
- * its box): there the text goes in when the field is tapped. The activity is enabled only while the lab is on, so with it
+ * request's result, ✕ or leaving hands back nothing; [handBack] has the keyboard type it. The activity is enabled only while the lab is on, so with it
  * off Hex never answers the request.
  */
 class VoiceInputActivity : Activity() {
@@ -30,9 +31,8 @@ class VoiceInputActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // This window takes input focus (no FLAG_ALT_FOCUSABLE_IM), so the app's field connects to the keyboard again
-        // once it closes: the keyboard that asked (SwiftKey) holds the text until it does, and Android 17 skips the
-        // reconnect when focus comes back to a window it thinks never lost it.
+        // The keyboard stays with the app's field while the bar listens (see [handBack]).
+        window.addFlags(WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM)
         setFinishOnTouchOutside(true)
         bar = VoiceBarView(this, ::tap, ::cancel)
         setContentView(FrameLayout(this).apply {
@@ -73,7 +73,7 @@ class VoiceInputActivity : Activity() {
         setResult(RESULT_OK, Intent()
             .putStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS, arrayListOf(text))
             .putExtra(RecognizerIntent.EXTRA_CONFIDENCE_SCORES, floatArrayOf(1f)))
-        finish()
+        handBack()
     }
 
     private fun cancel() {
@@ -84,11 +84,36 @@ class VoiceInputActivity : Activity() {
         finish()
     }
 
+    /**
+     * SwiftKey types the text the next time its keyboard starts on a field, and only tries once: a field that isn't
+     * ready loses it. Apps restart their field just after it reconnects, so a keyboard taken from the field while the
+     * bar listened reconnects to a connection about to close (Android 17, Compose apps such as Claude and Contacts).
+     * The bar leaves the keyboard on the field, then takes it for a moment before closing, so the field reconnects
+     * once on return with nothing to restart. The bar hides first, since the keyboard shows over it meanwhile, and
+     * closes once the keyboard is on this window ([HAND_BACK_MS] at most).
+     */
+    private fun handBack() {
+        bar.visibility = View.INVISIBLE
+        var closed = false
+        fun close() { if (!closed) { closed = true; finish() } }
+        window.decorView.setOnApplyWindowInsetsListener { view, insets ->
+            if (insets.isVisible(WindowInsets.Type.ime())) view.postDelayed(::close, SETTLE_MS)
+            view.onApplyWindowInsets(insets)
+        }
+        window.clearFlags(WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM)
+        window.decorView.postDelayed(::close, HAND_BACK_MS)
+    }
+
     // Another app in front ends it unanswered, as the keyboard's dictation ends when the keyboard goes.
     override fun onStop() { super.onStop(); if (!isChangingConfigurations) cancel() }
     override fun onDestroy() { capture.close(); super.onDestroy() }
 
     companion object {
+        /** How long the bar waits for the keyboard before closing anyway. */
+        private const val HAND_BACK_MS = 400L
+        /** After the keyboard reaches this window, so its start is through before the app's field gets it back. */
+        private const val SETTLE_MS = 50L
+
         /** Answers speech requests while Labs › Keyboard › Voice-only mode is on, and never while it is off. */
         fun setEnabled(context: Context, enabled: Boolean) {
             val state = if (enabled) PackageManager.COMPONENT_ENABLED_STATE_ENABLED else PackageManager.COMPONENT_ENABLED_STATE_DISABLED
