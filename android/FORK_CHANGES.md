@@ -136,6 +136,97 @@ Each setting's commits still use the names it had when it was added. Commit hash
   - Words go into Android's shared personal dictionary, so other keyboards and spell checkers see them too.
 - **Commit:** Android Keyboard: Learn new words, as SwiftKey learns them.
 
+### Neural autocorrect (Labs)
+
+- **Switch:** Labs › Keyboard › Neural autocorrect (off). On, it offers a one-time 145 MB download. The row then
+  shows Ready, a Test speed action, and how long space has waited for the model while you typed.
+- **What:** English autocorrect decides with a small language model that reads the text before the word (the
+  keyboard's last 96 characters), instead of only the word before it. It picks the reading that fits the sentence,
+  and it can tell a real word it has never seen ("tailscale") from a typo, because it scores words piece by piece
+  rather than looking them up.
+- **Why:** upstream's decoder scores each reading with word pairs (a bigram model). That can't use more than one
+  word of context and gives every unknown spelling the same flat cost, so names and tech words get split or
+  "corrected". Gboard (2024) and iOS 17 both moved to neural language models for this.
+- **How:**
+  - The model is Hugging Face's SmolLM2-135M (Apache-2.0), 8-bit GGUF, pinned by revision, size and SHA-256 in
+    `ModelStore.neural`. It runs in llama.cpp v1.0.0 (pinned by commit and SHA-256), built into a library of its
+    own, `libhextyping.so`, like Faster English dictation's. Two patches keep the keyboard's process from
+    starting a debugger or loading code from a path (`ggml-no-debugger.patch`, `llama-no-dlopen.patch`).
+  - It's a noisy-channel decoder. The taps' cost of each reading stays as upstream computes it. Only the
+    word-pair part is replaced by the model's cost in nats, −log P(word | text before) − log P(the word ends
+    there), weighed 1.5 (`neuralWeight`). The end-of-word term keeps a prefix ("tail") from beating the whole
+    word. Margins and every other rule are unchanged.
+  - When space finishes a word, the model scores the spelling as typed and the 9 cheapest readings
+    (`NEURAL_READINGS`) in one batch. Readings that begin alike share their tokens (a tree), each word's
+    sequence copied from the context's cache. The missed-space fallback ("thankyou" → "thank you") is taken
+    only where the model rates the split no less likely than the spelling.
+  - Run-together words, only with the model: a letter typed where the space was ("thatshcrazy" → "that's
+    crazy") reads as two words spelled as typed around it, at 4 nats more than a missed space
+    (`strayLetterCost`), never where that letter finishes a contraction ("canthappen" stays "can't happen").
+    The halves, and the words of a run of three or more ("thatssocrazy" → "that's so crazy"), may be
+    contractions typed without their apostrophe. The model then judges the split against the spelling, as
+    before: "tailscale", "kubernetes", "wireguard" and 20 other tech words checked stay whole.
+  - The model reads the text before a word while its first letters are typed (`prepare`), so space only decodes
+    the readings. The context's start moves 200 characters at a time, so the cache holds between words.
+  - Space waits for it at most 90 ms (`neuralBudget`). Without an answer by then, or before the model has
+    loaded, the word pairs decide as with the switch off. The model loads on the first word once the switch
+    is on, runs on 2 threads at display priority, and is freed after 5 idle minutes.
+  - Swipes too: when the finger lifts, the model scores the swipe decoder's 12 cheapest readings (one batch),
+    written as they'd go in, in place of their word pairs, weighed 1.0 (`SwipeReader.neuralWeight`). A loose
+    swipe, one whose best fit still costs more than 1.5 a letter (corners cut, "supposed" as a line back and
+    forth), has its path cost weighed 0.5 (`neuralPath`, `neuralLoose`), so the sentence counts for more; a
+    tidy one's counts in full. It starts reading the text before when the finger goes down. The preview while
+    the finger moves still uses the pairs.
+  - Completions while a word is typed: at each letter the model reads, without waiting, the word pairs' few
+    completions after the word before and the commonest words with those letters, 24 in all, in two batches
+    (`TypingWord.rankCompletions`, `NeuralScorer.costsLater`). The second batch is its own task, so a word space
+    finishes meanwhile is read first; a newer letter's request takes the place of an older one's. Once answered,
+    the strip's completions go likeliest in the sentence first, in whichever strip shows ("We were probably go"
+    offers "gonna"); after the pause the likeliest stays beside what space puts in, ahead of the taps' other
+    readings ("gon": "gone", then "gonna"). Space then finds the finished word already read.
+  - Next-word predictions after a space mid-sentence: the same, for the word pairs' likeliest after the word before
+    and the commonest words, 24 in all, read with the whole text before (`TypingWord.rankPredictions`): "I need to
+    pick up my" no longer reads only "my". Held-out sentences (2,375 next words): the next word is among the 3 for
+    20.1% → **29.3%**, first for 10.7% → **20.2%**.
+  - A tapped word you taught the keyboard (Learn new words, your own words) never costs more than it did without
+    the model, which barely knows it: it takes the cheaper of the two. A swipe spells nothing to keep, so there
+    your words get the model's cost: with thousands of imported SwiftKey words, a vague path would otherwise
+    read as one of them.
+- **Measured:**
+  - English quality gate (2,000 held-out sentences of noisy taps, `quality-gate.py en --neural MODEL
+    --neural-lib LIB`): word errors left 4.90% → **3.34%** (reduction 85.50% → 90.13%), correct words changed
+    0.32% → **0.05%**. Swipes (`swipe-bench.py en --neural MODEL --neural-lib LIB --neural-weight 1.0`, 12,515
+    held-out swipes with the sentence before): first word right 96.9% → **98.1%** (in the strip 99.7% either
+    way); 1.0 was the best of 0.5, 1.0 and 1.5 on even sentences and held on odd ones (96.8% → 98.0%). On
+    sloppier synthetic paths (`--noise sloppy`, and `vague`, which cuts corners hardest): **82.0% → 89.3%** and
+    **77.0% → 85.7%**, against 87.3% and 83.4% with the path weighed in full; tidy paths keep 98.1%. The loose
+    rule was chosen on even sentences from each swipe's readings (`--neural-dump`), against fixed weights 0.35–1.0
+    and smooth ones; a fixed 0.5 gains about as much on sloppy paths but tidy ones fall to 97.2%. A swipe takes
+    33 ms median on the host (45 ms 99th percentile). Run-together words (`split-bench.py`, the gate's sentences
+    with one space dropped or typed as a letter): word errors with a dropped space 7.71% → 7.67%, with a stray
+    letter 15.7% → **12.2%** (sentences all right 39% → 52%; the word pairs alone 13.1% and 20.5%), the gate's
+    own sentences unchanged. Completions (400 held-out sentences, words of 4 letters or more, the strip's 3 slots):
+    after 1 letter 25.4% → **43.1%** offer the word, after 2 51.6% → **72.0%**, after 3 80.4% → **91.2%** (12
+    candidates, one batch, gave 36.7%, 66.2%, 88.9%). The larger SmolLM2-360M and Qwen3-0.6B were no better on the gate before tuning
+    (3.92%, 4.11%), and are 2.7× and 4.4× the download.
+  - Galaxy Z Flip6, `hextyping-cli MODEL --bench 2`: an ordinary word 15 ms (95th percentile 19–23 ms); a word
+    with 10 readings 46 ms; reading the text before a word 8 ms. Warm and at 19% battery, the same took 20, 28,
+    75 and 12 ms. 4 threads were faster typically but stalled up to 200 ms; 6 were slower.
+  - Memory: 224 MB while loaded. The weights are read, not mapped: the CPU backend keeps a repacked copy for its
+    dot-product kernels (twice as fast), and a mapped file stayed resident beside it (334 MB).
+- **Limits:**
+  - English only. It needs the 145 MB download and keeps 224 MB in memory while loaded.
+  - The weight isn't tuned yet, and the gate's short Tatoeba sentences can't show what longer context or
+    unknown words gain. A messages-style test set with names and tech words is still to be made.
+  - Fix earlier words still uses the word pairs. Next-word predictions at a sentence's start or after a comma keep
+    their fixed lists.
+  - A stray letter splits only between two words spelled exactly as typed: with a typo in either half
+    ("youbkger" for "you over") it doesn't.
+  - Completions come from the 24 commonest words with the letters typed (and the word pairs' few): one rarer
+    than that ("gonna" for "g") shows only once more letters leave it among them.
+  - Built for ARMv8.2 with dot product (every recent phone). Emulators that translate ARM can't run it.
+- **Commit:** Android Keyboard: Neural autocorrect, a small language model reading the sentence (Labs).
+
 ## Dictation from another keyboard
 
 ### Voice-only mode answers apps' speech requests

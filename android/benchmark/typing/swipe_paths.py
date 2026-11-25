@@ -64,11 +64,15 @@ class SplitMix64:
 
 # Noise presets in key pitches, as Swift's Noise (see its comments for each field).
 TYPICAL = dict(sloppiness=0.25, offset=0.08, via=0.22, start=0.18, end=0.22, cut=0.5, overshoot=(-0.1, 0.35),
-               tremor=0.025, rate=120.0, speed=(0.6, 1.5), flow=0.0, hesitate=0.0)
+               tremor=0.025, rate=120.0, speed=(0.6, 1.5), flow=0.0, hesitate=0.0, corner=0.45)
 NOISE = {
     "typical": TYPICAL,
     "sloppy": {**TYPICAL, "offset": 0.15, "via": 0.36, "start": 0.3, "end": 0.42, "cut": 0.8,
                "overshoot": (-0.25, 0.7), "tremor": 0.055, "speed": (0.45, 1.2)},
+    # A finger that drags vaguely through a word and cuts across its turns: corners rounded by up to half the strokes
+    # around them, so "supposed" reads as a line back and forth (Android only; iPhone has no such preset).
+    "vague": {**TYPICAL, "offset": 0.15, "via": 0.36, "start": 0.3, "end": 0.42, "cut": 3.0, "corner": 0.5,
+              "overshoot": (-0.25, 0.7), "tremor": 0.055, "speed": (0.45, 1.2)},
     "none": {**TYPICAL, "sloppiness": 0.0, "offset": 0.0, "via": 0.0, "start": 0.0, "end": 0.0, "cut": 0.0,
              "overshoot": (0.0, 0.0), "tremor": 0.0, "speed": (1.0, 1.0)},
     "neat": {**TYPICAL, "offset": 0.04, "via": 0.12, "start": 0.1, "end": 0.12, "cut": 0.3,
@@ -162,7 +166,7 @@ def swipe_timed(centres, noise, s, rng, on_letter):
             anchors.append(len(path) - 1)
             continue
         # Fingers round a corner by a few tenths of a key, however long the strokes around it.
-        d = min(0.45 * min(lin, lout), noise["cut"] * min(s, 1.8) * rng.uniform(0.4, 1.4) * 0.6)
+        d = min(noise["corner"] * min(lin, lout), noise["cut"] * min(s, 1.8) * rng.uniform(0.4, 1.4) * 0.6)
         pin = (bx - (bx - ax) * (d / lin), by - (by - ay) * (d / lin))
         pout = (bx + (cx - bx) * (d / lout), by + (cy - by) * (d / lout))
         line_to(pin)

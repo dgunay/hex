@@ -110,6 +110,13 @@ internal class TypingPreferences(context: Context) {
     var adaptiveTouch: Boolean
         get() = prefs.getBoolean(ADAPTIVE_TOUCH, false)
         set(value) { prefs.edit().putBoolean(ADAPTIVE_TOUCH, value).apply() }
+    /** Labs › Keyboard › Neural autocorrect: English words are corrected with a small language model reading the
+     * text before them ([NeuralAutocorrect]), once its download is in. Off by default. */
+    var neuralAutocorrect: Boolean
+        get() = prefs.getBoolean(NEURAL_AUTOCORRECT, false)
+        set(value) { prefs.edit().putBoolean(NEURAL_AUTOCORRECT, value).apply() }
+    /** How long space waits for Neural autocorrect's model before the word pairs decide, in ms. Not in Settings. */
+    val neuralBudget: Int get() = prefs.getInt(NEURAL_BUDGET, NEURAL_BUDGET_DEFAULT).coerceIn(5, 5000)
     /** Labs › Keyboard › Clipboard history: the last texts copied, kept on this phone and offered in the Hex menu
      * ([ly.anoma.hex.keyboard.ClipboardHistory]). Off by default; off, the clipboard is never read for it. */
     var clipboardHistory: Boolean
@@ -190,6 +197,9 @@ internal class TypingPreferences(context: Context) {
         const val SWIPE_DELETE_LETTERS = "swipeDeleteLetters"
         const val MARKS_TAKE_FIX_SPACE = "marksTakeFixSpace"
         const val ADAPTIVE_TOUCH = "adaptiveTouch"
+        const val NEURAL_AUTOCORRECT = "neuralAutocorrect"
+        const val NEURAL_BUDGET = "neuralBudget"
+        const val NEURAL_BUDGET_DEFAULT = 90
         const val USE_IMPORTED_WORDS = "importedWords"
         /** A counter [ImportedWords] bumps whenever the imported list changes, so the keyboard reads it again. */
         const val IMPORTED_WORDS = "importedWordsRevision"

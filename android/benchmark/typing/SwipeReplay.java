@@ -27,8 +27,34 @@ public final class SwipeReplay {
         args = positional.toArray(new String[0]);
         String lang = args[1];
         TypingModel model = TypingModel.Companion.file(new File(args[0]), lang);
-        SwipeReader reader = new SwipeReader(new SpatialDecoder(model));
+        SpatialDecoder spatial = new SpatialDecoder(model);
+        SwipeReader reader = new SwipeReader(spatial);
         reader.prepare(false);
+        // Labs › Keyboard › Neural autocorrect: -Dhex.typing.model=GGUF (with -Dhex.typing.lib=libhextyping.so) scores the
+        // readings with that model, reading each word's sentence so far from -Dhex.typing.sentences (the held-out set the
+        // paths were made from); -Dhex.typing.weight sets its weight.
+        String neural = System.getProperty("hex.typing.model");
+        List<String[]> sentences = new ArrayList<>();
+        if (neural != null) {
+            NeuralModel m = NeuralModel.Companion.open(neural, Integer.getInteger("hex.typing.threads", 4));
+            if (m == null) throw new IllegalStateException("Neural model didn't load: " + neural);
+            spatial.setNeural(m);
+            String weight = System.getProperty("hex.typing.weight");
+            if (weight != null) reader.setNeuralWeight(Double.parseDouble(weight));
+            reader.setNeuralReadings(Integer.getInteger("hex.swipe.readings", reader.getNeuralReadings()));
+            String path = System.getProperty("hex.swipe.path");
+            if (path != null) reader.setNeuralPath(Double.parseDouble(path));
+            String loose = System.getProperty("hex.swipe.loose");
+            if (loose != null) reader.setNeuralLoose(Double.parseDouble(loose));
+            try (BufferedReader in = new BufferedReader(new InputStreamReader(new GZIPInputStream(new FileInputStream(System.getProperty("hex.typing.sentences"))), "UTF-8"))) {
+                String line;
+                while ((line = in.readLine()) != null) {
+                    List<String> ws = new ArrayList<>();
+                    for (String w : line.split("\t", -1)[2].split(" ")) if (!w.isEmpty()) ws.add(w);
+                    sentences.add(ws.toArray(new String[0]));
+                }
+            }
+        }
         KeyGrid grid = canonical(lang);
         // Frequency ranks by unigram cost, as the iPhone bench buckets them.
         Integer[] order = new Integer[model.getWords()];
@@ -40,6 +66,9 @@ public final class SwipeReplay {
         if (lang.equals("en")) for (String c : SwipeReader.Companion.getContractions()) extra.add(c.toLowerCase(Locale.ROOT));
 
         PrintWriter words = args.length > 3 ? new PrintWriter(new OutputStreamWriter(new FileOutputStream(args[3]), "UTF-8")) : null;
+        // -Dhex.swipe.dump=FILE: every reading the model scored, with its path cost and the model's, to try weights offline.
+        String dumpPath = System.getProperty("hex.swipe.dump");
+        PrintWriter dump = dumpPath == null ? null : new PrintWriter(new OutputStreamWriter(new FileOutputStream(dumpPath), "UTF-8"));
         List<long[]> rows = new ArrayList<>(); // swiped words: rank, length, decoder hit (1/3/4), keyboard hit (1/3/4), listed
         List<Long> nanos = new ArrayList<>();
         int total = 0, outside = 0, listedSwiped = 0;
@@ -64,7 +93,22 @@ public final class SwipeReplay {
                         xs[i] = Double.parseDouble(p[0]); ys[i] = Double.parseDouble(p[1]); ts[i] = Double.parseDouble(p[2]);
                     }
                     long start = System.nanoTime();
-                    SwipeDecoder.Reading reading = reader.decode(xs, ys, ts, n, grid, previous, 8);
+                    String context = null;
+                    final boolean first;
+                    if (neural != null) {
+                        String[] sentence = sentences.get(Integer.parseInt(f[0]));
+                        int position = Integer.parseInt(f[1]);
+                        context = String.join(" ", Arrays.asList(sentence).subList(0, position));
+                        first = position == 0;
+                    } else first = false;
+                    // As the keyboard writes a reading: a capital to start the sentence, "I", and names.
+                    kotlin.jvm.functions.Function1<String, String> cased = text -> {
+                        if (first) return text.substring(0, 1).toUpperCase(Locale.ROOT) + text.substring(1);
+                        if (lang.equals("en") && (text.equals("i") || text.startsWith("i'"))) return "I" + text.substring(1);
+                        int share = model.getCapitals() == null ? -1 : model.getCapitals().percent(text);
+                        return text.length() > 1 && share >= 95 ? text.substring(0, 1).toUpperCase(Locale.ROOT) + text.substring(1) : text;
+                    };
+                    SwipeDecoder.Reading reading = reader.decode(xs, ys, ts, n, grid, previous, dump == null ? 8 : 12, context, cased);
                     List<String> ranked = reader.ranked(reading.getCandidates());
                     long spent = System.nanoTime() - start;
                     if (pass == 0) continue;
@@ -76,12 +120,19 @@ public final class SwipeReplay {
                     int length = word.replace("'", "").length();
                     rows.add(new long[]{index >= 0 ? rank[index] : 999, length, hit(decoded, word), hit(keyboard, word), isListed ? 1 : 0});
                     if (isListed) listedSwiped++;
+                    if (dump != null) {
+                        StringBuilder dumped = new StringBuilder(f[0] + "\t" + f[1] + "\t" + word + "\t" + n);
+                        for (SwipeDecoder.Candidate c : reading.getCandidates())
+                            dumped.append('\t').append(c.getText().toLowerCase(Locale.ROOT)).append(' ').append(String.format(Locale.ROOT, "%.3f %.3f", c.getCost() - c.getLm(), c.getLm()));
+                        dump.println(dumped);
+                    }
                     if (words != null) words.println(f[0] + "\t" + f[1] + "\t" + word + "\t" + String.join(" ", keyboard.subList(0, Math.min(4, keyboard.size())))
                         + "\t" + String.join(" ", decoded.subList(0, Math.min(4, decoded.size()))));
                 }
             }
         }
         if (words != null) words.close();
+        if (dump != null) dump.close();
         System.out.printf(Locale.ROOT, "lang %s paths %s: words %d, swiped %d, not in the model %d%n", lang, new File(args[2]).getName(), total, rows.size() - listedSwiped, outside);
         for (int which = 2; which <= 3; which++) {
             String name = which == 2 ? "decoder" : "keyboard";

@@ -115,7 +115,7 @@ android {
         ndk { abiFilters += "arm64-v8a" }
         externalNativeBuild.cmake {
             arguments += listOf("-DANDROID_STL=c++_static", "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON")
-            targets += listOf("hexspeech", "hexenglish")
+            targets += listOf("hexspeech", "hexenglish", "hextyping")
         }
     }
     externalNativeBuild.cmake {

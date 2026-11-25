@@ -400,19 +400,27 @@ internal class KeyboardEngine(
     private fun showSuggestions(w: TypingWord?) {
         cancelChip()
         if (w != null && w.token.isNotEmpty()) {
-            surface?.suggestions(Suggestion.withEmoji(w.strip(autocorrect = false).map(::shown), emojiFor(w)))
+            val token = w.token
+            fun quick() = surface?.suggestions(Suggestion.withEmoji(w.strip(autocorrect = false).map(::shown), emojiFor(w)))
+            quick()
             // A stand-in's strip already is the finished one: nothing there changes after the pause.
             // A field that asked for no suggestions of its own gets no fix: space leaves its words alone.
             // With Keyboard › Autocorrect off the near words still come, as plain words space never puts in.
-            if (!correctingField || w.standIn || !canEndWord()) return
-            val token = w.token
+            val chip = correctingField && !w.standIn && canEndWord()
             val fixes = feedback.autocorrect
+            fun full() = surface?.suggestions(Suggestion.withEmoji(w.strip(fixes, nearWords = true).map {
+                if (it.kind == Suggestion.Kind.Fix && feedback.blocked(w.decoder.model.language, token, it.text))
+                    Suggestion(it.text, Suggestion.Kind.Word) else it
+            }.map(::shown), emojiFor(w)))
+            // Labs › Keyboard › Neural autocorrect: the completions, ranked by the model once it has read them, take
+            // their places in whichever strip is showing by then.
+            w.rankCompletions({ main.post(it) }) {
+                if (word === w && w.token == token) { if (!chip || pendingChip != null) quick() else full() }
+            }
+            if (!chip) return
             pendingChip = Runnable {
                 pendingChip = null
-                if (word === w && w.token == token) surface?.suggestions(Suggestion.withEmoji(w.strip(fixes, nearWords = true).map {
-                    if (it.kind == Suggestion.Kind.Fix && feedback.blocked(w.decoder.model.language, token, it.text))
-                        Suggestion(it.text, Suggestion.Kind.Word) else it
-                }.map(::shown), emojiFor(w)))
+                if (word === w && w.token == token) full()
             }.also { main.postDelayed(it, CHIP_PAUSE_MS) }
             return
         }
@@ -441,9 +449,15 @@ internal class KeyboardEngine(
      * Keyboard tools on leaves the strip's line to the tools instead of sentence starters. */
     private fun showPredictions(before: String?) {
         val w = word
-        surface?.suggestions(if (w != null && before != null && !symbols && canEndWord() &&
-            !KeyboardTools.showsInEmptyField(feedback.keyboardTools, before) { target.after(1) })
-            w.predictions(before, capitalize = capsWanted()).map { shown(Suggestion(it, Suggestion.Kind.Next)) } else emptyList())
+        val shows = w != null && before != null && !symbols && canEndWord() &&
+            !KeyboardTools.showsInEmptyField(feedback.keyboardTools, before) { target.after(1) }
+        // Keyed apart from any typed word ("\u0000"), so a word shown keeps its slot when the model's order comes.
+        surface?.suggestions(if (shows) w!!.predictions(before!!, capitalize = capsWanted()).map { shown(Suggestion(it, Suggestion.Kind.Next)) }
+            else emptyList(), "\u0000" + before.orEmpty())
+        // Labs › Keyboard › Neural autocorrect: the model's order, once it has read the sentence, if nothing was typed since.
+        if (shows) w!!.rankPredictions(before!!, { main.post(it) }) {
+            if (word === w && w.token.isEmpty() && before() == before) showPredictions(before)
+        }
     }
 
     /** A slot as the strip shows it: with Labs › Keyboard › Smart quotes on, a word shows the ’ it
@@ -884,8 +898,9 @@ internal class KeyboardEngine(
 
     // MARK: Swipe typing (Keyboard › Swipe typing; SwipeTyping.kt and KeyPlaneView)
 
-    /** What a swipe here is read with: the layout's reader and the word before. */
-    class SwipeContext(val reader: SwipeReader, val previous: String?)
+    /** What a swipe here is read with: the layout's reader and the word before; for Labs › Keyboard › Neural
+     * autocorrect, the text before (null with the lab off) and how a reading would go in. */
+    class SwipeContext(val reader: SwipeReader, val previous: String?, val context: String? = null, val cased: (String) -> String = { it })
 
     /** Whether a letter touch may become a swipe now: the setting on, on the letters page of a word field
      * (not a password, email address or number, where Hex reads no words), with its typing model loaded and not
@@ -912,7 +927,12 @@ internal class KeyboardEngine(
         swiping = true
         surface?.suggestions(emptyList())
         val b = before()
-        return SwipeContext(reader, TypingWord.previousWord(if (SwipeText.needsSpace(b)) "$b " else b).takeIf { it.isNotEmpty() })
+        val space = SwipeText.needsSpace(b)
+        // The model reads the text before while the finger moves, so the lift only scores the readings.
+        val neural = w.decoder.neural?.takeIf { it.active }?.also { it.prepare(b) }
+        val capital = swipeCapital(b, space)
+        return SwipeContext(reader, TypingWord.previousWord(if (space) "$b " else b).takeIf { it.isNotEmpty() },
+            neural?.let { b }, { swipeCased(it, capital) })
     }
 
     /** The swipe under way reads as [readings] so far, best first: the strip shows the first, as it would go in. */

@@ -122,18 +122,18 @@ internal class TypingModel private constructor(private val data: ByteBuffer, val
     fun context(spelling: String) = neverSuggest.context(spelling, index(spelling))
     /** The three likeliest allowed words after `previous`; [fill] tops a short list up with the
      * commonest words. */
-    fun nextWords(previous: Int, swears: Boolean, fill: Boolean = true): List<String> {
-        if (previous < 0) return completions("", swears, previous).map { text(it) }
-        val best = ArrayList<Int>(4)
+    fun nextWords(previous: Int, swears: Boolean, fill: Boolean = true, count: Int = 3): List<String> {
+        if (previous < 0) return completions("", swears, previous, count).map { text(it) }
+        val best = ArrayList<Int>(count + 1)
         for (at in int(rows + 4 * previous) until int(rows + 4 * (previous + 1))) {
             if (neverSuggest.blocks(int(seconds + 4 * at), swears, previous)) continue
             val cost = u8(bi + at)
             val i = best.indexOfFirst { u8(bi + it) > cost }
-            if (i >= 0) best.add(i, at) else if (best.size < 3) best.add(at)
-            if (best.size > 3) best.removeAt(3)
+            if (i >= 0) best.add(i, at) else if (best.size < count) best.add(at)
+            if (best.size > count) best.removeAt(count)
         }
         val result = best.mapTo(ArrayList()) { text(int(seconds + 4 * it)) }
-        if (fill && result.size < 3) for (i in completions("", swears, previous)) { val w = text(i); if (w !in result) result.add(w); if (result.size == 3) break }
+        if (fill && result.size < count) for (i in completions("", swears, previous, count)) { val w = text(i); if (w !in result) result.add(w); if (result.size == count) break }
         return result
     }
     /** The two likeliest words that complete a 1–3 letter `prefix` after `previous` (a word index, or
@@ -252,17 +252,19 @@ internal class TypingModel private constructor(private val data: ByteBuffer, val
         return if (r != 0L && length(a) == word.length) a else -1
     }
     // Common prefixes get reused on consecutive words. No corpus-sized heap trie.
-    private data class Prefix(val text: String, val swears: Boolean, val context: Int)
+    private data class Prefix(val text: String, val swears: Boolean, val context: Int, val count: Int = 3)
     private val prefixCache = object : LinkedHashMap<Prefix, IntArray>(96, 0.75f, true) {
         override fun removeEldestEntry(eldest: Map.Entry<Prefix, IntArray>?) = size > 96
     }
-    fun completions(prefix: String, swears: Boolean, previous: Int): IntArray {
-        val key = Prefix(prefix, swears, neverSuggest.restrictedContext(previous))
+    /** The [count] likeliest words starting with [prefix], by frequency: 3 for the strip, more for Labs › Keyboard ›
+     * Neural autocorrect to choose among. */
+    fun completions(prefix: String, swears: Boolean, previous: Int, count: Int = 3): IntArray {
+        val key = Prefix(prefix, swears, neverSuggest.restrictedContext(previous), count)
         return prefixCache.getOrPut(key) { rankCompletions(key) }
     }
     private fun rankCompletions(key: Prefix): IntArray {
         val r = range(key.text)
-        val best = IntArray(3) { -1 }
+        val best = IntArray(key.count) { -1 }
         for (word in (r ushr 32).toInt() until r.toInt()) {
             if (neverSuggest.blocks(word, key.swears, key.context)) continue
             val f = frequencyCost(word)

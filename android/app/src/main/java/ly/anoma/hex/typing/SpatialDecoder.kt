@@ -37,7 +37,30 @@ internal class SpatialDecoder(val model: TypingModel) {
      * the bottom row's upper half, or infinity (`spaceTapCost`). */
     class Tap(val cost: DoubleArray, val choices: IntArray, val belowLetters: Boolean, val missedSpaceCost: Double,
               val spaceCost: Double = Double.POSITIVE_INFINITY)
-    data class Reading(val text: String, val cost: Double, val frequency: Int)
+    /** [lm] is the weighted word-pair part of [cost], which Labs › Keyboard › Neural autocorrect replaces. */
+    data class Reading(val text: String, val cost: Double, val frequency: Int, val lm: Double = 0.0)
+    /** Labs › Keyboard › Neural autocorrect's language model. */
+    interface NeuralScorer {
+        /** Each of [words]' cost, in nats, typed after [context] (the text before the word); null when it can't
+         * answer now, and the word pairs decide. */
+        fun costs(context: String, words: List<String>): DoubleArray?
+        /** [costs] without waiting: [answer] gets them on another thread once they are known, or never, when a later
+         * call has taken this one's place first (typing goes faster than the model). For the strip's completions. */
+        fun costsLater(context: String, words: List<String>, answer: (DoubleArray) -> Unit) {
+            costs(context, words)?.let(answer)
+        }
+        /** Whether it would answer: off, or its model not loaded, the decoder doesn't ask. */
+        val active: Boolean get() = true
+        /** [context] is the text a word is being typed after: read it now, so the word's [costs] come sooner. */
+        fun prepare(context: String) {}
+    }
+    /** Labs › Keyboard › Neural autocorrect while it is on and its model is loaded, else null. */
+    @Volatile var neural: NeuralScorer? = null
+    /** How much the neural model's nats count against the taps', in place of the word pairs' [lmWeight]. */
+    @Volatile var neuralWeight = 1.5
+    @Volatile var strayLetterCost = STRAY_LETTER_COST
+    /** Whether Neural autocorrect reads run-together words with a stray letter for the space, or a contraction inside. */
+    @Volatile var neuralSplits = true
     data class Decision(val replace: String?, val readings: List<Reading>)
     // Google Books English has richer word pairs; these are the shared iOS R1 weights.
     private val lmWeight = if (model.language == "en") 1.5 else 1.25
@@ -208,7 +231,11 @@ internal class SpatialDecoder(val model: TypingModel) {
         return best.entries.sortedBy { it.value }.map { Reading(model.text(it.key), it.value, model.frequencyCost(it.key)) }
     }
 
-    fun decide(typed: String, taps: List<Tap>, previous: Int, swears: Boolean): Decision {
+    /** [context] is the text before the word, for Labs › Keyboard › Neural autocorrect: given while [neural] is set,
+     * the model scores the readings and the spelling as typed in place of the word pairs ([capital]: the word is
+     * scored with its first letter capitalised, as typed). */
+    fun decide(typed: String, taps: List<Tap>, previous: Int, swears: Boolean, context: String? = null,
+               capital: Boolean = false): Decision {
         val none = Decision(null, emptyList())
         if (typed.length !in 2..32 || taps.size != typed.length || model.neverSuggest.blocks(typed, swears, previous) ||
             typed.any { model.code(it) == 0 || it == '\'' }) return none
@@ -231,10 +258,14 @@ internal class SpatialDecoder(val model: TypingModel) {
         if (!cost.isFinite()) return none
         val readings = ArrayList<Reading>()
         // iOS applies the language score only to the five best spatial readings.
-        for ((w, spatial) in search(taps, 0, taps.size, edits(typed.length), swears, previous).sortedWith(spatialOrder).take(5)) if (w != literal)
-            readings.add(Reading(model.text(w), spatial + lmWeight * model.languageCost(previous, w), model.frequencyCost(w)))
+        for ((w, spatial) in search(taps, 0, taps.size, edits(typed.length), swears, previous).sortedWith(spatialOrder).take(5)) if (w != literal) {
+            val wordLm = lmWeight * model.languageCost(previous, w)
+            readings.add(Reading(model.text(w), spatial + wordLm, model.frequencyCost(w), wordLm))
+        }
         if (personal != null) for ((w, spatial) in search(taps, 0, taps.size, edits(typed.length), swears, previous, personal).sortedWith(spatialOrder).take(3))
-            if (w != yours) readings.add(Reading(personal.text(w), spatial + lmWeight * USER_WORD_COST, (USER_WORD_COST * 8).toInt()))
+            if (w != yours) readings.add(Reading(personal.text(w), spatial + lmWeight * USER_WORD_COST, (USER_WORD_COST * 8).toInt(), lmWeight * USER_WORD_COST))
+        // Labs › Keyboard › Neural autocorrect's splits: only where the model will judge them.
+        val splits = neuralSplits && context != null && neural?.active == true && model.language == "en"
         if (taps.size >= 3) {
             fun alone(f: Found) = model.length(f.word) > 1 || model.frequencyCost(f.word) < 56
             fun half(a: Int, b: Int, prev: Int) = search(taps, a, b, 0, swears, prev).sortedWith(spatialOrder)
@@ -243,7 +274,7 @@ internal class SpatialDecoder(val model: TypingModel) {
             // a name's middle letter ("rima") is never a space with slips around it.
             fun exact(a: Int, b: Int): List<Found> {
                 val spelling = typed.substring(a, b)
-                val word = model.index(spelling)
+                val word = exactWord(spelling, splits)
                 if (word < 0 || model.neverSuggest.blocks(word, swears)) return emptyList()
                 var cost = 0.0
                 for (i in a until b) cost += taps[i].cost[model.code(typed[i])]
@@ -254,7 +285,7 @@ internal class SpatialDecoder(val model: TypingModel) {
                     if (model.neverSuggest.blocksFollowing(r.word, swears, l.word)) continue
                     val lm = model.languageCost(previous, l.word) + model.languageCost(l.word, r.word)
                     readings.add(Reading(model.text(l.word) + " " + model.text(r.word), l.cost + r.cost + extra + lmWeight * lm,
-                        model.frequencyCost(l.word) + model.frequencyCost(r.word)))
+                        model.frequencyCost(l.word) + model.frequencyCost(r.word), lmWeight * lm))
                 }
             }
             for (k in 1 until taps.size) {
@@ -266,9 +297,22 @@ internal class SpatialDecoder(val model: TypingModel) {
                 } else if (taps[k].spaceCost.isFinite()) {
                     val exactLeft = exact(0, k)
                     if (exactLeft.isNotEmpty()) pair(exactLeft, exact(k + 1, taps.size), taps[k].spaceCost)
+                } else if (splits && k >= 2 && taps.size - k - 1 >= 2 && englishFixes[typed.substring(0, k + 1)]?.contains('\'') != true) {
+                    // Neural autocorrect: a letter anywhere where the space should be ("thatshcrazy"), between two words
+                    // spelled as typed; the model then judges the split against the spelling. Never the letter that makes
+                    // a contraction ("cant|happen" is can't, not "can happen").
+                    val exactLeft = exact(0, k)
+                    if (exactLeft.isNotEmpty()) pair(exactLeft, exact(k + 1, taps.size), taps[k].missedSpaceCost + strayLetterCost)
                 }
             }
         }
+        // The missed-space fallback below weighs its words' pairs against the spelling's word-pair cost.
+        val pairCost = cost
+        val neural = neural
+        // The model's own cost of the spelling as typed, in nats, once it has scored the readings.
+        var modelTyped: Double? = null
+        if (neural != null && context != null && readings.isNotEmpty()) rescore(neural, context, capital, typed, lmWeight * lm, cost, readings)
+            ?.let { (newCost, nats) -> cost = newCost; modelTyped = nats }
         readings.sortWith(compareBy<Reading> { it.cost }.thenBy { it.text })
         val best = readings.firstOrNull()
         // A listed rare word takes a one-word fix as a spelling nobody knows does, but is split into
@@ -283,7 +327,13 @@ internal class SpatialDecoder(val model: TypingModel) {
         // known spelling or a likelier reading that only missed the margin; not German, whose model
         // is lowercase and whose nouns take their capital in the one-word path.
         if (replace == null && !knownLiteral && model.language != "de" && typed.length >= 5) {
-            missedSpaceReading(taps, typed, previous, swears, cost)?.let { fallback ->
+            missedSpaceReading(taps, typed, previous, swears, pairCost, splits)?.takeIf { fallback ->
+                // Neural autocorrect: the words a missed space makes, only where the model reads them as no less likely
+                // than the spelling as typed ("tailscale" stays, "thankyou" splits).
+                val typedNats = modelTyped ?: return@takeIf true
+                val nats = neural?.costs(context!!, listOf(cased(fallback.text, capital)))?.singleOrNull()
+                nats != null && nats.isFinite() && nats <= typedNats
+            }?.let { fallback ->
                 val likeliest = shown.firstOrNull()
                 if (likeliest == null || fallback.cost <= likeliest.cost || likeliest.text.equals(fallback.text, ignoreCase = true)) {
                     replace = fallback.text
@@ -295,6 +345,36 @@ internal class SpatialDecoder(val model: TypingModel) {
         if (best == null && replace == null) return none
         return Decision(replace, shown.take(3))
     }
+
+    /** Labs › Keyboard › Neural autocorrect: the model's cost for each reading and for the spelling as typed takes the
+     * place of their word pairs' ([Reading.lm], [typedLm]), weighed by [neuralWeight]. Rewrites [readings] in place and
+     * returns the spelling's new cost and the model's own cost of it in nats, or null (nothing changed) when the model
+     * can't answer. */
+    private fun rescore(neural: NeuralScorer, context: String, capital: Boolean, typed: String, typedLm: Double,
+                        typedCost: Double, readings: MutableList<Reading>): Pair<Double, Double>? {
+        fun shown(text: String) = cased(text, capital)
+        // The model reads the spelling and the cheapest readings; the rest, which the word pairs already put far
+        // behind, are no choice once it has.
+        readings.sortWith(compareBy<Reading> { it.cost }.thenBy { it.text })
+        val kept = readings.distinctBy { it.text }.filter { it.text != typed }.take(NEURAL_READINGS).map { it.text }.toSet()
+        val words = listOf(typed) + kept
+        val costs = neural.costs(context, words.map(::shown)) ?: return null
+        if (costs.size != words.size || costs.any { !it.isFinite() }) return null
+        val byWord = words.indices.associate { words[it] to costs[it] }
+        readings.retainAll { it.text in byWord }
+        // A word you taught the keyboard never costs more than it did without the model, which barely knows it.
+        fun yours(text: String) = (personal?.index(text.lowercase()) ?: -1) >= 0
+        for (i in readings.indices) {
+            val r = readings[i]
+            var lm = neuralWeight * byWord.getValue(r.text)
+            if (yours(r.text)) lm = minOf(lm, r.lm)
+            readings[i] = r.copy(cost = r.cost - r.lm + lm, lm = lm)
+        }
+        var lm = neuralWeight * byWord.getValue(typed)
+        if (yours(typed)) lm = minOf(lm, typedLm)
+        return (typedCost - typedLm + lm) to byWord.getValue(typed)
+    }
+    private fun cased(text: String, capital: Boolean) = if (capital) text.replaceFirstChar { it.uppercaseChar() } else text
 
     /** Whether [decide] reading [taps] would put [reading], one word, in place of [typed]: it beats the spelling as
      * typed by the same margin. Null for a reading of two words or more, which only [decide] can tell. Labs › Keyboard ›
@@ -376,11 +456,12 @@ internal class SpatialDecoder(val model: TypingModel) {
     // What a missed space can still make of taps nothing else read (iOS missedSpaceReading): the
     // cheaper of a word and a slipped second word, or three to six words spelled as typed, taken only
     // when its words, without the spaces' cost, cost no more than the run nobody knows does.
-    private fun missedSpaceReading(taps: List<Tap>, typed: String, previous: Int, swears: Boolean, literalCost: Double): Reading? {
+    private fun missedSpaceReading(taps: List<Tap>, typed: String, previous: Int, swears: Boolean, literalCost: Double,
+                                   contractions: Boolean = false): Reading? {
         val space = taps[0].missedSpaceCost
         fun affordable(r: Reading?) = r?.takeIf { it.cost - space * (it.text.count { c -> c == ' ' }) <= literalCost }
         val slipped = affordable(slippedSecondWord(taps, typed, previous, swears))
-        val segmented = affordable(exactSegmentation(taps, typed, previous, swears))
+        val segmented = affordable(exactSegmentation(taps, typed, previous, swears, contractions))
         return when {
             slipped != null && segmented != null -> if (segmented.cost < slipped.cost) segmented else slipped
             else -> slipped ?: segmented
@@ -421,7 +502,7 @@ internal class SpatialDecoder(val model: TypingModel) {
     // Three to six words typed with no spaces, each spelled as typed ("seeyoutomorrow" -> "see you
     // tomorrow"): the cheapest path per end, last word and word count, words found by walking the
     // model's list one letter at a time from each start.
-    private fun exactSegmentation(taps: List<Tap>, typed: String, previous: Int, swears: Boolean): Reading? {
+    private fun exactSegmentation(taps: List<Tap>, typed: String, previous: Int, swears: Boolean, contractions: Boolean = false): Reading? {
         val n = typed.length
         if (n !in 5..32) return null
         val spatial = DoubleArray(n + 1)
@@ -438,6 +519,13 @@ internal class SpatialDecoder(val model: TypingModel) {
                 if (child == 0L) break
                 lo = (child ushr 32).toInt(); hi = child.toInt()
                 if (model.length(lo) == end - start && canStandAlone(lo) && !model.neverSuggest.blocks(lo, swears)) ends.add(end to lo)
+            }
+            // Neural autocorrect: a contraction typed without its apostrophe ("thatsocrazy" -> "that's so crazy").
+            if (contractions) for (end in start + 2..minOf(n, start + 8)) {
+                val spelling = typed.substring(start, end)
+                if (model.index(spelling) >= 0) continue
+                val word = exactWord(spelling, true)
+                if (word >= 0 && !model.neverSuggest.blocks(word, swears)) ends.add(end to word)
             }
             if (ends.isEmpty()) continue
             for ((k, path) in states[start]) {
@@ -463,10 +551,22 @@ internal class SpatialDecoder(val model: TypingModel) {
         return best?.let { p -> Reading(p.words.joinToString(" ") { model.text(it) }, p.cost, p.words.sumOf { model.frequencyCost(it) }) }
     }
 
+    /** The model's word spelled [spelling], or with [contractions], the contraction it is without its apostrophe
+     * ("thats" -> "that's"); -1 without one. */
+    private fun exactWord(spelling: String, contractions: Boolean): Int {
+        val word = model.index(spelling)
+        if (word >= 0 || !contractions || model.language != "en") return word
+        val fix = englishFixes[spelling]?.takeIf { '\'' in it } ?: return -1
+        return model.index(fix).takeIf { it >= 0 } ?: model.index(fix.lowercase())
+    }
+
     private fun key(last: Int, count: Int) = (last.toLong() shl 8) or count.toLong()
     private companion object {
         val spatialOrder = compareBy<Found> { it.cost }.thenBy { it.word }
         const val EDIT_COST = 7.0
+        // Labs › Keyboard › Neural autocorrect: readings the model scores beside the spelling (libhextyping takes 12).
+        // The English gate reads no better with 15, and a Flip6 scores 10 words in 46 ms against 16 in 57.
+        const val NEURAL_READINGS = 9
         const val TWO_EDITS_FROM = 6
         const val STRONG_UNKNOWN_COST = 30.0
         const val MAX_TAP_COST = 9.0
@@ -476,6 +576,8 @@ internal class SpatialDecoder(val model: TypingModel) {
         // A space tap reads as a letter only within about the bar's top fifth.
         const val MERGE_REACH = 3.0
         const val USER_WORD_COST = 11.0
+        /** Neural autocorrect: what a letter tapped where the space should be costs beside a missed space. */
+        const val STRAY_LETTER_COST = 4.0
     }
     private fun foldAccents(s: String) = Normalizer.normalize(s, Normalizer.Form.NFD).filter { it !in '\u0300'..'\u0308' || it == '\u0303' }
 }

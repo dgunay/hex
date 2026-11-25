@@ -78,3 +78,38 @@ target_link_libraries(hexenglish PRIVATE -Wl,--start-group ${BINARY_DIR}/src/lib
 target_link_options(hexenglish PRIVATE -Wl,--gc-sections -Wl,--exclude-libs,ALL)
 add_custom_command(TARGET hexenglish POST_BUILD VERBATIM
     COMMAND ${CMAKE_COMMAND} -DNM=${CMAKE_NM} -DLIB=$<TARGET_FILE:hexenglish> -P ${CMAKE_CURRENT_LIST_DIR}/check-imports.cmake)
+
+# Labs › Keyboard › Neural autocorrect: llama.cpp at its v1.0.0 release, in a library of its own, libhextyping.so,
+# loaded only while that switch is on. It vendors its own ggml too, so it is a separate CMake build like transcribe.cpp,
+# with the same patch keeping ggml_abort in process, and llama-no-dlopen.patch leaving ggml's backend loader no dlopen
+# (the CPU backend is linked in, so it never loads one).
+ExternalProject_Add(llama_cpp
+    URL https://codeload.github.com/ggml-org/llama.cpp/tar.gz/b1b770d90d94cad9e9ea5b993bdbc383a522fb28
+    URL_HASH SHA256=ae8556670b17c25931cd39eb7c95617650eaf6091bbcff206750583ddde1acb4
+    TLS_VERIFY ON
+    DOWNLOAD_EXTRACT_TIMESTAMP ON
+    PATCH_COMMAND ${PATCH_EXECUTABLE} -p1 -N -t -F0 -i ${CMAKE_CURRENT_LIST_DIR}/ggml-no-debugger.patch
+        COMMAND ${PATCH_EXECUTABLE} -p1 -N -t -F0 -i ${CMAKE_CURRENT_LIST_DIR}/llama-no-dlopen.patch
+    CMAKE_ARGS -DCMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE} -DANDROID_ABI=${ANDROID_ABI}
+        -DANDROID_PLATFORM=${ANDROID_PLATFORM} -DANDROID_STL=${ANDROID_STL}
+        -DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=${ANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES}
+        -DCMAKE_MAKE_PROGRAM=${CMAKE_MAKE_PROGRAM} -DCMAKE_BUILD_TYPE=Release -DCMAKE_POSITION_INDEPENDENT_CODE=ON
+        "-DCMAKE_C_FLAGS=${HEXENGLISH_FLAGS}" "-DCMAKE_CXX_FLAGS=${HEXENGLISH_FLAGS} -fvisibility-inlines-hidden"
+        -DBUILD_SHARED_LIBS=OFF -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF -DLLAMA_BUILD_TOOLS=OFF
+        -DLLAMA_BUILD_SERVER=OFF -DLLAMA_BUILD_COMMON=OFF -DLLAMA_OPENSSL=OFF
+        -DGGML_NATIVE=OFF -DGGML_OPENMP=OFF -DGGML_LLAMAFILE=OFF -DGGML_BACKEND_DL=OFF -DGGML_CPU_ARM_ARCH=armv8.2-a+dotprod
+    # Only the library: v1.0.0 also builds its own app, which needs the common library left out here.
+    BUILD_COMMAND ${CMAKE_COMMAND} --build <BINARY_DIR> --target llama
+    INSTALL_COMMAND ""
+    BUILD_BYPRODUCTS <BINARY_DIR>/src/libllama.a <BINARY_DIR>/ggml/src/libggml.a
+        <BINARY_DIR>/ggml/src/libggml-cpu.a <BINARY_DIR>/ggml/src/libggml-base.a)
+ExternalProject_Get_Property(llama_cpp SOURCE_DIR BINARY_DIR)
+add_library(hextyping SHARED hextyping.cpp)
+add_dependencies(hextyping llama_cpp)
+target_compile_features(hextyping PRIVATE cxx_std_17)
+target_include_directories(hextyping PRIVATE ${SOURCE_DIR}/include ${SOURCE_DIR}/ggml/include)
+target_link_libraries(hextyping PRIVATE -Wl,--start-group ${BINARY_DIR}/src/libllama.a ${BINARY_DIR}/ggml/src/libggml.a
+    ${BINARY_DIR}/ggml/src/libggml-cpu.a ${BINARY_DIR}/ggml/src/libggml-base.a -Wl,--end-group android log)
+target_link_options(hextyping PRIVATE -Wl,--gc-sections -Wl,--exclude-libs,ALL)
+add_custom_command(TARGET hextyping POST_BUILD VERBATIM
+    COMMAND ${CMAKE_COMMAND} -DNM=${CMAKE_NM} -DLIB=$<TARGET_FILE:hextyping> -P ${CMAKE_CURRENT_LIST_DIR}/check-imports.cmake)

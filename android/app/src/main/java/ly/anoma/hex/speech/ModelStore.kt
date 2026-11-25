@@ -38,9 +38,9 @@ internal fun waitsForWifi(mobileDataChosen: Boolean, unmetered: Boolean?) = !mob
 internal interface OfflineScreen
 
 /** Hex's network operation: an explicit, fixed model GET from Hex's own screens, each file pinned by revision, size and
- * SHA-256 ([small] from setup or Dictation settings, [english] from Labs or, with Labs › Pick the English model for this
- * phone, when Hex is opened). The keyboard never calls it. A wifiFirst download (both models, whoever asked) waits for
- * an unmetered network ([State.WaitingForWifi]) unless the person chooses mobile data. */
+ * SHA-256 ([small] from setup or Dictation settings, [english] and [neural] from Labs or, with Labs › Pick the English
+ * model for this phone, [english] when Hex is opened). The keyboard never calls it. A wifiFirst download (both speech
+ * models, whoever asked) waits for an unmetered network ([State.WaitingForWifi]) unless the person chooses mobile data. */
 internal class ModelStore private constructor(private val name: String, private val size: Long, private val hash: String,
                                               private val url: String, private val extension: String,
                                               internal val wifiFirst: Boolean = false) {
@@ -53,6 +53,11 @@ internal class ModelStore private constructor(private val name: String, private 
         val english = ModelStore("parakeet-tdt_ctc-110m", 135373280L, "7dd44c74a331d788a4e5f8b16913b3feb29ced22cf5613aad0e0f6cd30516296",
             "https://huggingface.co/handy-computer/parakeet-tdt_ctc-110m-gguf/resolve/1c3f0d5378fdd358905cc410a93ed9e64f52d170/parakeet-tdt_ctc-110m-Q8_0.gguf",
             "gguf", wifiFirst = true)
+        /** Labs › Keyboard › Neural autocorrect: Hugging Face's SmolLM2-135M (Apache-2.0), as QuantFactory converted it
+         * to 8-bit GGUF. */
+        val neural = ModelStore("smollm2-135m", 144810464L, "b761d9ccdfce67726e41ca2ef30e9dfbcf6a32ca2aaef47df5c049ec362d04cd",
+            "https://huggingface.co/QuantFactory/SmolLM2-135M-GGUF/resolve/d948db3614be18259a175aafd7689a70f1cb4e2f/SmolLM2-135M.Q8_0.gguf",
+            "gguf")
     }
 
     enum class Problem { Connection, Server, Space }

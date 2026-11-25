@@ -6,6 +6,8 @@ import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.provider.Settings
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.*
@@ -50,6 +52,7 @@ import ly.anoma.hex.keyboard.KeyboardHeight
 import ly.anoma.hex.speech.*
 import ly.anoma.hex.typing.AdaptiveTouchModel
 import ly.anoma.hex.typing.AdaptiveTouchStore
+import ly.anoma.hex.typing.NeuralAutocorrect
 import ly.anoma.hex.typing.TypingPreferences
 import ly.anoma.hex.keyboard.Tap
 import ly.anoma.hex.keyboard.tap
@@ -183,6 +186,13 @@ internal fun HexSettings(setup: Setup, speech: SpeechPreferences, typing: Typing
     }
     val touchStored = remember(revision) { AdaptiveTouchStore.stored(context) }
     var resettingTouch by remember { mutableStateOf(false) }
+    val neuralOn = remember(revision) { typing.neuralAutocorrect }
+    val neural = ModelStore.neural.state.collectAsState().value
+    // Labs › Keyboard › Neural autocorrect: how long space has waited for the model, read again whenever the page is
+    // shown, and the speed test's result once it has run.
+    val neuralTiming = remember(revision, page) { NeuralAutocorrect.timing() }
+    var neuralTest by remember { mutableStateOf<List<Long>?>(null) }
+    var neuralTesting by remember { mutableStateOf(false) }
     val passwordManager = remember(revision) { typing.passwordManagerSuggestions }
     val voiceOnly = remember(revision) { typing.voiceOnly }
     val voiceBarFromMenu = remember(revision) { typing.voiceBarFromMenu }
@@ -646,6 +656,19 @@ internal fun HexSettings(setup: Setup, speech: SpeechPreferences, typing: Typing
                                     }
                                 }
                                 Rule()
+                                NeuralRows(neuralOn, neural, neuralTiming, neuralTest, neuralTesting,
+                                    toggle = {
+                                        typing.neuralAutocorrect = it
+                                        // Off stops a download under way; a finished one stays until Delete download.
+                                        if (!it && neural != ModelStore.State.Ready) ModelStore.neural.delete(context)
+                                    },
+                                    runTest = {
+                                        neuralTesting = true
+                                        Thread({
+                                            val result = NeuralAutocorrect.speedTest(context)
+                                            Handler(Looper.getMainLooper()).post { neuralTest = result; neuralTesting = false }
+                                        }, "Hex neural speed test").start()
+                                    })
                                 // Labs › Keyboard › Clipboard history: off deletes every kept text at once, as its line says.
                                 Toggle(stringResource(R.string.clipboard_history), stringResource(R.string.clipboard_history_detail),
                                     clipboardHistory, noteLines = Int.MAX_VALUE) {
@@ -844,5 +867,41 @@ private fun PracticeCard(practice: String, mod: Modifier = Modifier, change: (St
             cursorBrush = SolidColor(ink), decorationBox = { field ->
                 Box { if (practice.isEmpty()) Label(stringResource(R.string.settings_test_keyboard), muted = true); field() }
             })
+    }
+}
+
+/** Labs › Keyboard › Neural autocorrect: the switch, its download as Faster English dictation's, how long space has waited
+ * for the model, and a speed test. */
+@Composable private fun NeuralRows(on: Boolean, state: ModelStore.State, timing: NeuralAutocorrect.Timing, test: List<Long>?,
+                                   testing: Boolean, toggle: (Boolean) -> Unit, runTest: () -> Unit) {
+    val context = LocalContext.current
+    val size = ModelStore.neural.megabytes
+    Toggle(stringResource(R.string.neural_autocorrect), stringResource(R.string.neural_autocorrect_detail, size), on,
+        noteLines = Int.MAX_VALUE, change = toggle)
+    if (!on) return
+    Rule()
+    when (state) {
+        ModelStore.State.Available, ModelStore.State.WaitingForWifi -> Entry(stringResource(R.string.fast_english_download, size), value = "",
+            action = { ModelStore.neural.download(context) })
+        is ModelStore.State.Loading -> Entry(stringResource(R.string.fast_english_loading, size, state.percent))
+        is ModelStore.State.Retry -> Entry(stringResource(when (state.problem) {
+            ModelStore.Problem.Connection -> R.string.fast_english_no_connection
+            ModelStore.Problem.Space -> R.string.fast_english_no_space
+            ModelStore.Problem.Server -> R.string.fast_english_stopped
+        }), value = stringResource(R.string.model_try_again), action = { ModelStore.neural.download(context) })
+        ModelStore.State.Ready -> {
+            Entry(stringResource(R.string.fast_english_ready, size), value = stringResource(R.string.fast_english_delete),
+                action = { ModelStore.neural.delete(context); toggle(false) })
+            Rule()
+            Entry(when {
+                testing -> stringResource(R.string.neural_testing)
+                test != null -> { val sorted = test.sorted()
+                    stringResource(R.string.neural_test_result, sorted[sorted.size / 2], sorted.last()) }
+                else -> stringResource(R.string.neural_test)
+            }, value = if (testing) "" else "›", action = if (testing) null else runTest)
+            Label(if (timing.words == 0) stringResource(R.string.neural_timing_none)
+                  else stringResource(R.string.neural_timing, timing.words, timing.medianMs, timing.p95Ms, timing.late),
+                muted = true, size = 13, mod = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp))
+        }
     }
 }

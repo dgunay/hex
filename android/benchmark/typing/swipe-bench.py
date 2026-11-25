@@ -29,9 +29,16 @@ def paths(lang, noise, out):
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('languages', nargs='*', help=' '.join(LANGUAGES) + ' (default: all)')
-    parser.add_argument('--noise', default='typical', choices=['typical', 'neat', 'sloppy', 'none'])
+    parser.add_argument('--noise', default='typical', choices=['typical', 'neat', 'sloppy', 'vague', 'none'])
     parser.add_argument('--device', help='adb serial: run on the device against the installed APK')
     parser.add_argument('--out', type=Path, default=ANDROID / 'build/swipe-bench')
+    parser.add_argument('--neural', type=Path, help='Labs › Keyboard › Neural autocorrect: the GGUF model (host only)')
+    parser.add_argument('--neural-lib', type=Path, help="the host's libhextyping.so")
+    parser.add_argument('--neural-weight', type=float)
+    parser.add_argument('--neural-readings', type=int, help="how many of the path's readings the model chooses among")
+    parser.add_argument('--neural-path', type=float, help="the path cost's weight beside the model's")
+    parser.add_argument('--neural-loose', type=float, help='the path cost a letter above which a swipe counts as loose')
+    parser.add_argument('--neural-dump', action='store_true', help="write {lang}-{noise}-neural-dump.tsv: each swipe's 12 readings, path and model costs")
     args = parser.parse_args()
     if not set(args.languages) <= set(LANGUAGES):
         parser.error('languages: ' + ' '.join(LANGUAGES))
@@ -60,7 +67,7 @@ def main():
             apk = subprocess.check_output(adb + ['shell', 'pm', 'path', 'ly.anoma.hex'], text=True).strip().removeprefix('package:')
         for lang in args.languages:
             source = paths(lang, args.noise, args.out)
-            words = args.out / f'{lang}-{args.noise}-words.tsv'
+            words = args.out / f'{lang}-{args.noise}{"-neural" if args.neural else ""}-words.tsv'
             # Held-out words an earlier model lacked, swiped and scored apart (SwipeReplay --outside).
             listed = HERE / f'swipe-outside-{lang}.txt'
             outside = ['--outside', listed] if listed.is_file() else []
@@ -78,9 +85,23 @@ def main():
                 subprocess.run(adb + ['shell', 'rm', f'{dev}/{source.name}'], check=True)
                 subprocess.run(adb + ['pull', dev + '/words.tsv', words], check=True, capture_output=True)
             else:
-                report = subprocess.check_output([jdk / 'java', '-Xmx1g', '-Dfile.encoding=UTF-8', '-cp', str(classes) + os.pathsep + cp.read_text(),
+                neural = []
+                if args.neural:
+                    neural = [f'-Dhex.typing.model={args.neural}', f'-Dhex.typing.lib={args.neural_lib}',
+                              f'-Dhex.typing.sentences={HERE / "held-out" / f"{lang}.tsv.gz"}']
+                    if args.neural_weight is not None:
+                        neural.append(f'-Dhex.typing.weight={args.neural_weight}')
+                    if args.neural_readings is not None:
+                        neural.append(f'-Dhex.swipe.readings={args.neural_readings}')
+                    if args.neural_path is not None:
+                        neural.append(f'-Dhex.swipe.path={args.neural_path}')
+                    if args.neural_loose is not None:
+                        neural.append(f'-Dhex.swipe.loose={args.neural_loose}')
+                    if args.neural_dump:
+                        neural.append(f'-Dhex.swipe.dump={args.out / f"{lang}-{args.noise}-neural-dump.tsv"}')
+                report = subprocess.check_output([jdk / 'java', '-Xmx1g', '-Dfile.encoding=UTF-8', *neural, '-cp', str(classes) + os.pathsep + cp.read_text(),
                                                   'local.hex.bench.SwipeReplay', MODELS / f'{lang}.hextm', lang, source, words] + outside, text=True)
-            (args.out / f'{lang}-{args.noise}{"-device" if args.device else ""}.txt').write_text(report)
+            (args.out / f'{lang}-{args.noise}{"-device" if args.device else ""}{"-neural" if args.neural else ""}.txt').write_text(report)
             print(report, flush=True)
 
 

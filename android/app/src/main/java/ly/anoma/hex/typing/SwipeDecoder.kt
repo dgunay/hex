@@ -98,8 +98,9 @@ internal class SwipeDecoder(val model: TypingModel, val parameters: Parameters =
         }
     }
 
-    /** A reading: the word as the model spells it (lowercase, with its accents), or an extra word as given. */
-    data class Candidate(val text: String, val cost: Double)
+    /** A reading: the word as the model spells it (lowercase, with its accents), or an extra word as given. [lm] is
+     * the share of [cost] the word model gave it (weighed), which Labs › Keyboard › Neural autocorrect replaces. */
+    data class Candidate(val text: String, val cost: Double, val lm: Double = 0.0)
     data class Reading(val candidates: List<Candidate>, val scored: Int)
 
     /** Words read beside the model's, each with its own cost (-ln P): English contractions, which Google
@@ -255,15 +256,16 @@ internal class SwipeDecoder(val model: TypingModel, val parameters: Parameters =
         val order = pool.indices.sortedWith(compareBy { quick[it] })
 
         val previousWord = previous?.let { model.index(it.lowercase()) } ?: -1
-        val scored = ArrayList<Pair<Int, Double>>()
+        val scored = ArrayList<Triple<Int, Double, Double>>()
         for (q in order.take(max(limit, p.shortlist))) {
             val c = pool[q]
             val word = words[c]
             if (word >= 0 && model.neverSuggest.blocksFollowing(word, swears, previousWord)) continue
-            scored.add(word to spatial(c, aligned = true) + p.lmWeight * lmCost(word, previousWord, extras))
+            val lm = p.lmWeight * lmCost(word, previousWord, extras)
+            scored.add(Triple(word, spatial(c, aligned = true) + lm, lm))
         }
         scored.sortBy { it.second }
-        val candidates = scored.take(limit).map { (word, cost) -> Candidate(if (word >= 0) model.text(word) else extras!!.texts[-1 - word], cost) }
+        val candidates = scored.take(limit).map { (word, cost, lm) -> Candidate(if (word >= 0) model.text(word) else extras!!.texts[-1 - word], cost, lm) }
         return Reading(candidates, words.size)
     }
 
@@ -627,8 +629,43 @@ internal class SwipeReader(private val spatial: SpatialDecoder) {
         decoder.extra = if (words.isEmpty()) null else SwipeDecoder.ExtraWords(model, words)
     }
 
-    fun decode(xs: DoubleArray, ys: DoubleArray, times: DoubleArray?, count: Int, grid: KeyGrid, previous: String?, limit: Int) =
-        decoder.read(xs, ys, times, count, grid, previous, limit)
+    /** Labs › Keyboard › Neural autocorrect's weight on the model's cost of a swiped word, as [SpatialDecoder.neuralWeight]
+     * is on a tapped one's. */
+    @Volatile var neuralWeight = NEURAL_WEIGHT
+    /** How many of the path's readings the model chooses among, and how much the path's own cost counts beside it on a
+     * loose swipe: one whose best fit costs more than [neuralLoose] a letter. A tidy path's cost counts in full. */
+    @Volatile var neuralReadings = NEURAL_READINGS
+    @Volatile var neuralPath = NEURAL_PATH
+    @Volatile var neuralLoose = NEURAL_LOOSE
+
+    /** The swipe's readings. With [context], the text before the word, and the lab on ([SpatialDecoder.neural]), the
+     * model's cost of each reading in that text, written as [cased] would put it in, takes the place of its word pair's;
+     * if the model doesn't answer in time, the pairs decide. */
+    fun decode(xs: DoubleArray, ys: DoubleArray, times: DoubleArray?, count: Int, grid: KeyGrid, previous: String?, limit: Int,
+               context: String? = null, cased: (String) -> String = { it }): SwipeDecoder.Reading {
+        val neural = spatial.neural?.takeIf { context != null && it.active }
+        val reading = decoder.read(xs, ys, times, count, grid, previous, if (neural == null) limit else maxOf(limit, neuralReadings))
+        if (context == null || neural == null || reading.candidates.size < 2) return reading.copy(candidates = reading.candidates.take(limit))
+        val candidates = reading.candidates
+        val shown = candidates.map { cased(it.text) }
+        val asked = shown.distinct()
+        // libhextyping scores 12 words a call.
+        val costs = asked.chunked(12).map { neural.costs(context, it) ?: return reading.copy(candidates = candidates.take(limit)) }
+            .reduce { a, b -> a + b }
+        if (costs.size != asked.size || costs.any { !it.isFinite() }) return reading.copy(candidates = candidates.take(limit))
+        val byWord = asked.indices.associate { asked[it] to costs[it] }
+        // A swipe that cuts corners ("supposed" as a line back and forth) fits no word well: there the path tells less,
+        // and the sentence more.
+        val fit = candidates.minBy { it.cost - it.lm }
+        val loose = (fit.cost - fit.lm) / maxOf(1, fit.text.length) > neuralLoose
+        val weight = neuralWeight; val path = if (loose) neuralPath else 1.0
+        return reading.copy(candidates = candidates.indices.map { i ->
+            // Your own words get the model's cost too: a swipe spells nothing to keep, and with thousands of imported
+            // words, a vague path would otherwise read as one of them.
+            val c = candidates[i]; val lm = weight * byWord.getValue(shown[i])
+            c.copy(cost = path * (c.cost - c.lm) + lm, lm = lm)
+        }.sortedBy { it.cost }.take(limit))
+    }
 
     /** The readings best first once a rare name or abbreviation costs [NAME_COST] more (iPhone's `SwipeTyping.ranked`):
      * the model's lowercase list holds names ("kent", "ut") a loose swipe of a common word could read as, and they
@@ -649,6 +686,11 @@ internal class SwipeReader(private val spatial: SpatialDecoder) {
     }
 
     companion object {
+        /** Tuned on the swipe benchmark's held-out English paths (swipe-bench.py --neural). */
+        const val NEURAL_WEIGHT = 1.0
+        const val NEURAL_READINGS = 12
+        const val NEURAL_PATH = 0.5
+        const val NEURAL_LOOSE = 1.5
         const val NAME_COST = 4.0
         /** About the model's 2,500th word. */
         const val COMMON_NAME_COST = 10.0
