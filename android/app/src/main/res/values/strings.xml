@@ -203,7 +203,7 @@
     <string name="number_row_detail">Shows 1–0 above the letters</string>
     <string name="fix_earlier_words">Fix earlier words</string>
     <string name="learn_words">Learn new words</string>
-    <string name="learn_words_detail">Words you keep as typed join your personal dictionary. Long-press one in the suggestions to remove it</string>
+    <string name="learn_words_detail">Remembers words you keep as typed. Long-press one to remove it</string>
     <string name="keyboard_word_learned">Added “%1$s” to your dictionary. Tap to remove</string>
     <string name="keyboard_word_forget">Tap to remove “%1$s” from your dictionary</string>
     <string name="fix_earlier_words_detail">Go back into a word to see what else it could be, and what you first typed</string>
