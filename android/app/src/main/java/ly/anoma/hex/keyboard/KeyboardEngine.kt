@@ -35,6 +35,8 @@ internal interface KeyboardSurface {
     fun undoDictation(shown: Boolean)
     /** The strip's tools changed (Labs › Keyboard › Keyboard tools): Undo follows the last autocorrection. */
     fun toolsChanged() {}
+    /** The letter keys' centres, for reading a word you went back to (Keyboard › Fix earlier words). */
+    fun keyGrid(): KeyGrid? = null
 }
 
 /** Whether a dictation may be joined to the text at the cursor. A signed dictation (Labs › Signature) joins
@@ -96,6 +98,8 @@ internal class KeyboardEngine(
         const val CHIP_PAUSE_MS = 100L
         /** Undo dictation stays this long unless something else happens first (iPhone Hex: 12 s). */
         const val UNDO_MS = 12_000L
+        /** Autocorrections a field remembers for Keyboard › Fix earlier words. */
+        const val FIXES_KEPT = 20
     }
     private var pendingChip: Runnable? = null
     var surface: KeyboardSurface? = null
@@ -120,6 +124,12 @@ internal class KeyboardEngine(
     private var expectedCaret = -1
     private data class Undo(val language: String, val original: String, val replacement: String)
     private var undo: Undo? = null
+    // Keyboard › Fix earlier words: this field's recent autocorrections, newest last, so a word you go back to offers
+    // what you typed; and the word the strip is offering others for, with where the cursor was in it.
+    private val fixes = ArrayDeque<Undo>()
+    private class Earlier(val cursor: Int, val word: EarlierWord, val typed: String?, val language: String)
+    private var earlier: Earlier? = null
+    private var scratch: TypingWord? = null
     private val shift = ShiftState()
     private var symbols = false
     private var more = false
@@ -184,7 +194,7 @@ internal class KeyboardEngine(
         exactField = field.exact
         keyEventEditor = field.keyEvents
         learnsTyping = field.learns
-        resetTyping(); word = null; clearSpaces(); forgetSwipe(); toldSwipe = false
+        resetTyping(); word = null; clearSpaces(); forgetSwipe(); toldSwipe = false; fixes.clear(); earlier = null
         adaptive = adaptiveTouch(); adaptive?.beginSession()
         pad = Pad.of(attribute.inputType)
         symbols = pad != null
@@ -214,6 +224,7 @@ internal class KeyboardEngine(
             refreshCaps()
             // The strip's Undo tool follows the autocorrection still being right before the cursor.
             if (feedback.keyboardTools && undo != null) surface?.toolsChanged()
+            if (!swiping) showEarlier()
         }
     }
 
@@ -511,7 +522,7 @@ internal class KeyboardEngine(
      * double-space), and a closing mark takes its place (in a URL field, also / and the other joiners). */
     fun pickSuggestion(text: String) {
         val w = word ?: return
-        if (pickSwiped(text)) return
+        if (pickSwiped(text) || pickEarlier(text)) return
         edited()
         if ((symbols && w.token.isEmpty()) || !canEndWord()) return
         val old = w.token
@@ -579,7 +590,7 @@ internal class KeyboardEngine(
                 if (fix != null && !feedback.blocked(lang, fix.original, fix.replacement) &&
                     replace(fix.original, fix.replacement + " ")) {
                     cancelChip()
-                    undo = Undo(lang, fix.original, fix.replacement)
+                    undo = Undo(lang, fix.original, fix.replacement).also(::rememberFix)
                     if (expectedCaret >= 0) expectedCaret += fix.replacement.length + 1 - fix.original.length
                     teachEnd(b, fix); w.reset(); afterSpace(now); if (feedback.marksTakeFixSpace) fixedAnchor = spaceAnchor; return
                 }
@@ -630,6 +641,7 @@ internal class KeyboardEngine(
                 val fix = w.finish(value[0], commit = ::smartWord)
                 if (fix != null && !feedback.blocked(w.decoder.model.language, fix.original, fix.replacement) &&
                     replace(fix.original, fix.replacement + value)) {
+                    rememberFix(Undo(w.decoder.model.language, fix.original, fix.replacement))
                     teachEnd(text, fix); resetTyping(); showPredictions(before()); inputDone(); return
                 }
             }
@@ -990,6 +1002,59 @@ internal class KeyboardEngine(
         takenBack = s.word to left
         surface?.suggestions(listOf(Suggestion(s.word, Suggestion.Kind.Word)))
         refreshCaps()
+        return true
+    }
+
+    private fun rememberFix(fix: Undo) {
+        // A split or a join changes more than the one word a cursor goes back into.
+        if (' ' in fix.original || ' ' in fix.replacement) return
+        fixes.addLast(fix)
+        if (fixes.size > FIXES_KEPT) fixes.removeFirst()
+    }
+
+    /**
+     * Keyboard › Fix earlier words: with the cursor in or at the end of a word while nothing is being typed (deleted
+     * back into, or tapped), the strip offers what autocorrect replaced there and other words its letters could be,
+     * read with the words on both sides. Returns whether the strip shows them.
+     */
+    private fun showEarlier(): Boolean {
+        earlier = null
+        if (!feedback.fixEarlierWords || secure || keyEventEditor || !correctingField || symbols || pad != null) return false
+        val w = word ?: return false
+        if (w.token.isNotEmpty() || w.standIn || selStart < 0 || selStart != selEnd || swiped != null || takenBack != null) return false
+        val b = before()
+        // A pick that held its space for the text after: the strip has that word's next words.
+        if ((heldAnchor != null && heldAnchor == b) || (swipeAnchor != null && swipeAnchor == b)) return false
+        val at = EarlierWord.at(b, target.after(40).orEmpty()) ?: return false
+        val grid = surface?.keyGrid() ?: return false
+        val reader = scratch?.takeIf { it.decoder === w.decoder } ?: TypingWord(w.decoder, w.spatial).also { scratch = it }
+        reader.suggestSwearWords = w.suggestSwearWords; reader.addsCapitals = w.addsCapitals
+        val language = w.decoder.model.language
+        val typed = fixes.lastOrNull { it.language == language && it.replacement == at.text }?.original
+        val others = reader.revisit(at.text, at.before, at.next, grid).filterNot { it.equals(typed, ignoreCase = true) }
+        val slots = listOfNotNull(typed?.let { Suggestion(it, Suggestion.Kind.Typed) }) +
+            others.map { Suggestion(it, Suggestion.Kind.Word) }
+        if (slots.isEmpty()) return false
+        cancelChip()
+        earlier = Earlier(selStart, at, typed, language)
+        surface?.suggestions(slots.take(Suggestion.SLOTS).map(::shown))
+        return true
+    }
+
+    /** A strip slot tapped while it offers words for an earlier word: the whole word becomes [text], the cursor
+     * after it. Taking back what you typed tells autocorrect not to make that fix again, as Delete's undo does. */
+    private fun pickEarlier(text: String): Boolean {
+        val e = earlier ?: return false
+        earlier = null
+        edited(); clearSpaces(); resetTyping()
+        val w = e.word
+        if (selStart != e.cursor || selEnd != e.cursor || target.before(w.head.length) != w.head ||
+            target.after(w.tail.length) != w.tail) { surface?.suggestions(emptyList()); return true }
+        target.beginBatch()
+        try {
+            if (target.setSelection(e.cursor - w.head.length, e.cursor + w.tail.length)) target.commit(smartWord(text))
+        } finally { target.endBatch() }
+        if (text == e.typed && learnsTyping) feedback.undo(e.language, e.typed, w.text)
         return true
     }
 }

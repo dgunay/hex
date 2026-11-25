@@ -94,6 +94,35 @@ internal class TypingWord(val decoder: SpatialDecoder, val spatial: Boolean) {
         pending = null
     }
     fun restored(text: String, before: String) { reset(before); explicit(text) } // No taps: space keeps the undone spelling.
+
+    /**
+     * Other words for [text], a word you went back to (Keyboard › Fix earlier words): its letters as taps on their
+     * keys' centres in [grid], read by the decoder with [before] and the word after it ([next]) as context. Up to
+     * [REVISIT_WORDS] words, likeliest first, never [text] itself, cased as it is. The word as it stands must not be
+     * much likelier than an offer: "the" in "on the table" offers nothing, "by" in "to by a car" offers "buy".
+     * Leaves this word reset; a separate instance from the word being typed.
+     */
+    fun revisit(text: String, before: String, next: String?, grid: KeyGrid): List<String> {
+        reset(before)
+        val key = lookup(text.lowercase())
+        if (text.length !in 1..MAX_LENGTH || standIn || protected(text)) return emptyList()
+        val taps = key.map { c -> grid.centres[c]?.let { decoder.score(grid, it.x, it.y) } ?: return emptyList() }
+        val nextIndex = next?.let { model.index(lookup(it.lowercase())) } ?: -1
+        val readings = decoder.revisit(key, taps, previous, nextIndex, suggestSwearWords)
+        // The word as it stands: the model's own score, or an unknown word's cost when it has none.
+        val own = readings.firstOrNull { it.text == key }?.cost ?: Double.POSITIVE_INFINITY
+        val out = ArrayList<String>(REVISIT_WORDS)
+        for (r in readings) {
+            if (out.size == REVISIT_WORDS) break
+            if (r.text == key || r.cost > own + REVISIT_MARGIN || blocked(r.text)) continue
+            val shown = if (decoder.personal?.owns(r.text) == true) r.text else matchCase(text, displayed(r.text))
+            if (out.none { it.equals(shown, ignoreCase = true) }) out.add(shown)
+        }
+        reset()
+        return out
+    }
+    private fun protected(text: String) = text.drop(1).any { it.isUpperCase() } ||
+        (model.language == "en" && text.lowercase() in shorthand)
     /** Up to three words for the strip between words (iOS #2125): at a sentence's start three common
      * first words, after a comma or other mid-sentence mark words that start a clause, after a word
      * the likeliest next words from the word pairs with the language's commonest words filling the
@@ -495,6 +524,10 @@ internal class TypingWord(val decoder: SpatialDecoder, val spatial: Boolean) {
     }
     companion object {
         const val MAX_LENGTH = 32
+        /** Words a revisited word offers beside what autocorrect replaced (Keyboard › Fix earlier words). */
+        const val REVISIT_WORDS = 3
+        /** How much less likely than the word as it stands, in nats, an offer for a revisited word may be. */
+        const val REVISIT_MARGIN = 10.0
         /** How far past its own touch area a likelier letter may reach, in dp, and the nats of odds
          * (ln of how many times likelier) it needs for each dp it claims (iOS letterReach, letterOddsPerPoint). */
         const val REACH = 5.0

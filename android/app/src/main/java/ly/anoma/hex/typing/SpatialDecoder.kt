@@ -193,6 +193,21 @@ internal class SpatialDecoder(val model: TypingModel) {
     // [strong] two from [TWO_EDITS_FROM] letters on, so a long word with two slips ("kehbaodd") still reads as meant.
     private fun edits(length: Int) = if (strong && length >= TWO_EDITS_FROM) 2 else 1
 
+    /** Other words for one you went back to (Keyboard › Fix earlier words), likeliest first: the model's words its
+     * letters read as within an edit or two, each scored by the words on both sides of it, as SwiftKey offers
+     * "buy" for "by" in "I want to by a car". The word as it stands is among them when the model knows it, so a
+     * caller can tell how much likelier the others are. [next] is the word after it in the text, or -1. */
+    fun revisit(typed: String, taps: List<Tap>, previous: Int, next: Int, swears: Boolean): List<Reading> {
+        if (typed.length !in 1..32 || taps.size != typed.length || typed.any { model.code(it) == 0 }) return emptyList()
+        fun context(w: Int) = model.languageCost(previous, w) + if (next >= 0) model.languageCost(w, next) else 0.0
+        val best = HashMap<Int, Double>()
+        for ((w, spatial) in search(taps, 0, taps.size, maxOf(1, edits(typed.length)), swears, previous)) {
+            val cost = spatial + lmWeight * context(w)
+            if (cost < (best[w] ?: Double.POSITIVE_INFINITY)) best[w] = cost
+        }
+        return best.entries.sortedBy { it.value }.map { Reading(model.text(it.key), it.value, model.frequencyCost(it.key)) }
+    }
+
     fun decide(typed: String, taps: List<Tap>, previous: Int, swears: Boolean): Decision {
         val none = Decision(null, emptyList())
         if (typed.length !in 2..32 || taps.size != typed.length || model.neverSuggest.blocks(typed, swears, previous) ||

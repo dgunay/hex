@@ -58,6 +58,10 @@ internal class TypingPreferences(context: Context) {
         set(value) { prefs.edit().putBoolean(SNUG_BOTTOM, value).apply() }
     /** Keyboard › Hold delete for words: a held delete takes letters, then whole words, faster the longer
      * it is held (as SwiftKey's does). Off by default: held, delete repeats letters as Gboard's does. */
+    /** Keyboard › Fix earlier words: going back into a word offers other words for it. Off by default. */
+    var fixEarlierWords: Boolean
+        get() = prefs.getBoolean("fixEarlierWords", false)
+        set(value) { prefs.edit().putBoolean("fixEarlierWords", value).apply() }
     var holdDeleteWords: Boolean
         get() = prefs.getBoolean("holdDeleteWords", false)
         set(value) { prefs.edit().putBoolean("holdDeleteWords", value).apply() }

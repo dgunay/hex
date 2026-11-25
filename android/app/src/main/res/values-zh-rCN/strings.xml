@@ -175,6 +175,8 @@
     <string name="letter_symbols_detail">长按字母输入符号，例如长按 m 输入 ?</string>
     <string name="number_row">数字行</string>
     <string name="number_row_detail">在字母上方显示 1–0</string>
+    <string name="fix_earlier_words">修改之前的词</string>
+    <string name="fix_earlier_words_detail">回到一个词里，查看它可能是的其他词和你最初输入的内容</string>
     <string name="hold_delete_words">长按删除整词</string>
     <string name="hold_delete_words_detail">长按删除键删除整个词</string>
     <string name="strong_autocorrect">更强的自动更正</string>
