@@ -1096,12 +1096,22 @@ internal class KeyboardEngine(
         val w = e.word
         if (selStart != e.cursor || selEnd != e.cursor || target.before(w.head.length) != w.head ||
             target.after(w.tail.length) != w.tail) { surface?.suggestions(emptyList()); return true }
+        // As a pick of the word being typed: a space follows it, unless the text after already separates it, where the
+        // cursor stays before that space and a word typed next takes it ("I backed into a word": no space was left).
+        val holds = SpaceRules.separates(target.after(w.tail.length + 1)?.drop(w.tail.length))
+        var picked = false
         target.beginBatch()
         try {
-            if (target.setSelection(e.cursor - w.head.length, e.cursor + w.tail.length)) target.commit(smartWord(text))
+            if (target.setSelection(e.cursor - w.head.length, e.cursor + w.tail.length))
+                picked = target.commit(if (holds) smartWord(text) else smartWord(text) + " ")
         } finally { target.endBatch() }
         if (text == e.typed && learnsTyping) feedback.undo(e.language, e.typed, w.text)
         if (text == e.typed) word?.decoder?.takeIf { it.model.language == e.language }?.let { learn(text, it, e.word.before) }
+        if (picked) {
+            val b = before()
+            if (holds) heldAnchor = b else pickedAnchor = b
+            showPredictions(b)
+        }
         return true
     }
 }

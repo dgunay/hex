@@ -125,11 +125,14 @@ Each setting's commits still use the names it had when it was added. Commit hash
     next word.
   - Up to 3 candidates are shown (`REVISIT_WORDS`). Each must be within 10 nats of the word as it stands
     (`REVISIT_MARGIN`), so a word that fits ("the" in "on the table") offers nothing.
-  - Replacing the word selects it with `setSelection` and commits the new one in a batch edit.
+  - Replacing the word selects it with `setSelection` and commits the new one in a batch edit. A space follows it
+    as after any pick, unless the text after already separates it (a space or a closing mark): then the cursor
+    stays before that space, and the next word typed takes it.
 - **Limits:**
   - It never shows in password fields, `TYPE_NULL` editors, number pads, or while symbols show.
   - Splits and joins ("deli ate" → "delicate") aren't remembered, since they change more than one word.
 - **Commit:** `9446017d` Android Keyboard: Fix earlier words offers other words for one you go back to.
+  Its pick's space: Android Keyboard: Fix earlier words' pick takes its space as any pick does.
 
 ### Learn new words
 
