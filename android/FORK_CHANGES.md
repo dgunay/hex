@@ -38,6 +38,22 @@ Each setting's commits still use the names it had when it was added. Commit hash
   sounds, so `click` reads the setting itself first. The System volume still scales it.
 - **Commit:** Android Keyboard: Key click volume.
 
+### Steadier suggestion strip, and More suggestions (Labs)
+
+- **What:** while a word is typed, a word already shown in the strip keeps its slot when a later strip for the same
+  word comes (the fix after the pause, Neural autocorrect's ranked completions). With Labs › Keyboard › More
+  suggestions on (off by default), the strip scrolls right to 8 more words past its three slots.
+- **Why:** the strips arriving one after another moved the word about to be tapped ("gonna" jumped as "gone" came in),
+  and the three slots hid likely words.
+- **How:** `Suggestion.place(slots, previous)` keeps a shown word's slot while the word typed so far goes on; only
+  what was typed, the fix and the emoji have places of their own (the fix keeps the middle, so a word there moves
+  once to a free slot). Before the pause, a word the keyboard doesn't know is laid out as the strip after it will
+  be: what was typed on the left, the middle kept for the fix, the likeliest completion on the right
+  (`strip(fixLater = true)`), so "gonna" stays put when "gone" comes. `TypingWord.strip(more = 8)` returns the words past the slots in the same order, and
+  `StripView` lays the slots at the strip's width inside a `HorizontalScrollView` with the rest after them; a new
+  word scrolls back to the start.
+- **Commit:** Android Keyboard: Steadier suggestion strip, and More suggestions (Labs).
+
 ## Delete
 
 ### Delete words when held

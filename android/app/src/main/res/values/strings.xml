@@ -256,6 +256,8 @@
         <item quantity="one">%s word imported</item>
         <item quantity="other">%s words imported</item>
     </plurals>
+    <string name="more_suggestions">More suggestions</string>
+    <string name="more_suggestions_detail">Scroll the suggestion strip right for more words</string>
     <string name="marks_take_fix_space">Punctuation after autocorrect</string>
     <string name="marks_take_fix_space_detail">A period or comma right after an autocorrection goes against the word</string>
     <string name="adaptive_touch">Adaptive touch</string>

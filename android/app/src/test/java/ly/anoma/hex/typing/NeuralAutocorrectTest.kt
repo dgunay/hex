@@ -101,7 +101,11 @@ class NeuralAutocorrectTest {
         assertEquals("asked once for the same letters", 1, answers)
         type("We were probably ", "gon")
         w.rankCompletions({ it() }) {}
+        val quick = Suggestion.place(w.strip(autocorrect = false, fixLater = true), null)
         val full = w.strip()
+        assertEquals("the quick strip keeps gonna where the full one puts it", listOf("gon", "gonna"),
+            Suggestion.place(full, quick).let { listOf(it[0]?.text, it[2]?.text) })
+        assertEquals(quick[2], Suggestion.place(full, quick)[2])
         assertEquals("space would put in gone", "gone", full.first { it.kind == Suggestion.Kind.Fix }.text)
         assertTrue("and the full strip keeps the model's gonna beside it: $full", full.any { it.text == "gonna" })
         type("I can't ", "go")
@@ -130,6 +134,18 @@ class NeuralAutocorrectTest {
         stand.asked.clear()
         w.rankPredictions("Hello. ", { it() }) { answers++ }
         assertTrue("a sentence's start isn't asked", stand.asked.isEmpty())
+    }
+
+    @Test fun aShownWordKeepsItsSlot() {
+        fun w(t: String) = Suggestion(t, Suggestion.Kind.Word)
+        val first = Suggestion.place(listOf(Suggestion("gon", Suggestion.Kind.Typed), w("gonna"), w("gone")), null)
+        assertEquals(listOf("gon", "gonna", "gone"), first.map { it?.text })
+        val later = Suggestion.place(listOf(Suggestion("gon", Suggestion.Kind.Typed), w("gone"), w("gonna")), first)
+        assertEquals("a reranked strip leaves gonna where it was", first, later)
+        val fix = Suggestion.place(listOf(Suggestion("gon", Suggestion.Kind.Typed), Suggestion("gone", Suggestion.Kind.Fix), w("gonna")), first)
+        assertEquals("the fix takes the middle, its own place, and gonna the slot left", listOf("gon", "gone", "gonna"), fix.map { it?.text })
+        val noTyped = Suggestion.place(listOf(w("going"), w("gonna"), w("got")), Suggestion.place(listOf(w("gonna"), w("going"), w("got")), null))
+        assertEquals("without the typed word too", "gonna", noTyped[1]?.text)
     }
 
     /** A straight swipe through [word]'s key centres, a point every 4 px. */

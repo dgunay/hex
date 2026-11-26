@@ -62,6 +62,13 @@ internal class StripView(context: Context, private val ime: HexKeyboard, private
     // Pinned suggestions may not scroll (Android's inline contract), so they sit at the area's edge.
     private val inlinePinned = LinearLayout(context)
     private val slotViews = List(3) { FrameLayout(context) }
+    // The three slots fill the strip's width; more words follow them past its right edge, a scroll away.
+    private val slotScroll = HorizontalScrollView(context)
+    private val slotContent = LinearLayout(context)
+    private val moreRow = LinearLayout(context)
+    /** What the slots showed, and for which word: while it goes on, a word keeps its slot and the scroll stays. */
+    private var placed: List<Suggestion?>? = null
+    private var placedFor: String? = null
     private val words = List(3) { Word(context) }
     private val measurePaint = TextPaint()
     private val dividers = List(2) { View(context) }
@@ -165,7 +172,21 @@ internal class StripView(context: Context, private val ime: HexKeyboard, private
             }
             slotRow.addView(slotViews[i], LinearLayout.LayoutParams(0, -1, 1f))
         }
-        idleRow.addView(slotRow, LinearLayout.LayoutParams(0, -1, 1f))
+        slotScroll.isHorizontalScrollBarEnabled = false
+        slotScroll.overScrollMode = OVER_SCROLL_NEVER
+        slotContent.orientation = LinearLayout.HORIZONTAL
+        slotContent.addView(slotRow, LinearLayout.LayoutParams(0, -1))
+        moreRow.orientation = LinearLayout.HORIZONTAL
+        moreRow.gravity = Gravity.CENTER_VERTICAL
+        slotContent.addView(moreRow, LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, -1))
+        slotScroll.addView(slotContent, FrameLayout.LayoutParams(LayoutParams.WRAP_CONTENT, -1))
+        // The slots are exactly the strip's width, as they were without the scroll.
+        slotScroll.addOnLayoutChangeListener { v, l, _, r, _, ol, _, or, _ ->
+            if (r - l != or - ol || slotRow.layoutParams.width != r - l) v.post {
+                slotRow.layoutParams = (slotRow.layoutParams as LinearLayout.LayoutParams).apply { width = v.width }
+            }
+        }
+        idleRow.addView(slotScroll, LinearLayout.LayoutParams(0, -1, 1f))
         inlineArea.orientation = LinearLayout.HORIZONTAL
         inlineArea.gravity = Gravity.CENTER_VERTICAL
         inlineChips.gravity = Gravity.CENTER_VERTICAL
@@ -288,11 +309,16 @@ internal class StripView(context: Context, private val ime: HexKeyboard, private
      * them, typed in quotes on the left then the fix (in a chip) or the likeliest word in the middle;
      * otherwise the likeliest word in the middle and the next on the left, as Gboard and iPhone place
      * them. The emoji always keeps the last slot (Labs › Keyboard › Emoji suggestions). */
-    fun suggestions(slots: List<Suggestion>) {
+    fun suggestions(slots: List<Suggestion>, word: String? = null) {
         // Typing or swiping started: the suggestions (a swipe's word so far) matter more than the notice, which comes
         // back in the next field.
         if (slots.any { it.kind == Suggestion.Kind.Typed } || ime.engine.swiping) notice = null
-        val shown = Suggestion.place(slots)
+        // The same word typed on (or the same letters' later strip): words already shown keep their slots.
+        val goesOn = word != null && placedFor != null && word.startsWith(placedFor!!, ignoreCase = true)
+        val shown = Suggestion.place(slots, if (goesOn) placed else null)
+        if (!goesOn) slotScroll.scrollTo(0, 0)
+        placed = shown; placedFor = word
+        showMore(Suggestion.more(slots, shown))
         offered = Array(Suggestion.SLOTS) { shown[it]?.text }
         var chip = -1
         for (i in 0..2) {
@@ -319,6 +345,24 @@ internal class StripView(context: Context, private val ime: HexKeyboard, private
         dividers[1].visibility = if (chip == 1 || chip == 2 || !filled[1] || !filled[2]) INVISIBLE else VISIBLE
         weigh()
         update()
+    }
+    /** The words past the three slots, each as wide as its word, with a rule before each. */
+    private fun showMore(more: List<Suggestion>) {
+        moreRow.removeAllViews()
+        for (s in more) {
+            moreRow.addView(View(context).apply { setBackgroundColor(color(R.color.rule)) },
+                LinearLayout.LayoutParams(maxOf(1, dp(1) / 2 + 1), dp(20)))
+            moreRow.addView(TextView(context).apply {
+                text = s.text
+                useInter(450); gravity = Gravity.CENTER; setTextColor(ink); setTextSize(TypedValue.COMPLEX_UNIT_DIP, StripText.SIZE)
+                maxLines = 1; includeFontPadding = false; minWidth = dp(56)
+                setPadding(dp(12), 0, dp(12), 0)
+                isFocusable = true
+                contentDescription = context.getString(R.string.keyboard_suggest, s.text)
+                setOnClickListener { ime.engine.pickSuggestion(s.text) }
+                setOnLongClickListener { if (ime.engine.ownsWord(s.text)) { ime.offerForget(s.text); true } else false }
+            }, LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, -1))
+        }
     }
     /** Each slot's share of the row follows its word's width, so a short word leaves the room a long
      * one needs; a word still wider than its share shrinks ([Word]) before it is ellipsized. A slot
@@ -412,7 +456,7 @@ internal class StripView(context: Context, private val ime: HexKeyboard, private
             } else statusText.setAutoSizeTextTypeUniformWithConfiguration(10, 14, 1, TypedValue.COMPLEX_UNIT_DIP)
         }
         inlineArea.visibility = if (chips) VISIBLE else GONE
-        slotRow.visibility = if (show) VISIBLE else GONE
+        slotScroll.visibility = if (show) VISIBLE else GONE
         toolsRow.visibility = if (tools.isNotEmpty()) VISIBLE else GONE
         toolEmoji.visibility = if (StripTool.Emoji in tools) VISIBLE else GONE
         toolPaste.visibility = if (StripTool.Paste in tools) VISIBLE else GONE

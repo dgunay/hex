@@ -62,9 +62,12 @@ class EmojiKeywordsTest {
 
     @Test fun theStripStillShowsThreeSlots() {
         val slots = (1..4).map { Suggestion("word$it", Suggestion.Kind.Word) }
-        val shown = Suggestion.withEmoji(slots, "😊")
+        val all = Suggestion.withEmoji(slots, "😊")
+        val shown = Suggestion.place(all)
         assertEquals(3, shown.size)
         assertEquals(Suggestion("😊", Suggestion.Kind.Emoji), shown.last())
+        assertEquals("the words it made room from follow, for the strip's scroll",
+            listOf("word3", "word4"), Suggestion.more(all, shown).map { it.text })
     }
 
     @Test fun parseSkipsCommentsAndKeepsTheFirstSpelling() {

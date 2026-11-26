@@ -105,6 +105,10 @@ internal class TypingPreferences(context: Context) {
     var marksTakeFixSpace: Boolean
         get() = prefs.getBoolean(MARKS_TAKE_FIX_SPACE, false)
         set(value) { prefs.edit().putBoolean(MARKS_TAKE_FIX_SPACE, value).apply() }
+    /** Labs › Keyboard › More suggestions: the strip scrolls right to more words past its three slots. Off by default. */
+    var moreSuggestions: Boolean
+        get() = prefs.getBoolean(MORE_SUGGESTIONS, false)
+        set(value) { prefs.edit().putBoolean(MORE_SUGGESTIONS, value).apply() }
     /** Labs › Keyboard › Adaptive touch: the decoder reads taps with your own key centres once it has learned them
      * ([AdaptiveTouch], kept by [AdaptiveTouchStore]). Off by default. */
     var adaptiveTouch: Boolean
@@ -206,6 +210,7 @@ internal class TypingPreferences(context: Context) {
         const val SMART_QUOTES = "smartQuotes"
         const val SWIPE_DELETE_LETTERS = "swipeDeleteLetters"
         const val MARKS_TAKE_FIX_SPACE = "marksTakeFixSpace"
+        const val MORE_SUGGESTIONS = "moreSuggestions"
         const val ADAPTIVE_TOUCH = "adaptiveTouch"
         const val NEURAL_AUTOCORRECT = "neuralAutocorrect"
         const val NEURAL_BUDGET = "neuralBudget"

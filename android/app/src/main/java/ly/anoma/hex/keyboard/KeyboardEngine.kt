@@ -32,6 +32,9 @@ internal interface KeyboardSurface {
     /** The strip, in the typing model's order: what was typed first when it shows, then the fix or the
      * likeliest word, then the rest. Next words after a space are [Suggestion.Kind.Next]. */
     fun suggestions(slots: List<Suggestion>)
+    /** [suggestions] for the word typed so far, [word]: while the word goes on, a word already shown keeps its slot
+     * and the strip keeps its scroll. */
+    fun suggestions(slots: List<Suggestion>, word: String) = suggestions(slots)
     /** Offer Undo dictation, or stop offering it. */
     fun undoDictation(shown: Boolean)
     /** The strip's tools changed (Labs › Keyboard › Keyboard tools): Undo follows the last autocorrection. */
@@ -99,6 +102,8 @@ internal class KeyboardEngine(
         /** The fix and the decoder's readings wait for this pause in typing: working them out costs a
          * search (2 ms median, 16 ms p95 per letter on the API 31 emulator), which shouldn't delay keys. */
         const val CHIP_PAUSE_MS = 100L
+        /** Words past the strip's three slots, which it scrolls to. */
+        const val MORE_WORDS = 8
         /** Undo dictation stays this long unless something else happens first (iPhone Hex: 12 s). */
         const val UNDO_MS = 12_000L
         /** Autocorrections a field remembers for Keyboard › Fix earlier words. */
@@ -401,17 +406,20 @@ internal class KeyboardEngine(
         cancelChip()
         if (w != null && w.token.isNotEmpty()) {
             val token = w.token
-            fun quick() = surface?.suggestions(Suggestion.withEmoji(w.strip(autocorrect = false).map(::shown), emojiFor(w)))
-            quick()
             // A stand-in's strip already is the finished one: nothing there changes after the pause.
             // A field that asked for no suggestions of its own gets no fix: space leaves its words alone.
             // With Keyboard › Autocorrect off the near words still come, as plain words space never puts in.
             val chip = correctingField && !w.standIn && canEndWord()
             val fixes = feedback.autocorrect
-            fun full() = surface?.suggestions(Suggestion.withEmoji(w.strip(fixes, nearWords = true).map {
+            // Labs › Keyboard › More suggestions: words past the three slots, a scroll away.
+            val more = if (feedback.moreSuggestions) MORE_WORDS else 0
+            fun quick() = surface?.suggestions(Suggestion.withEmoji(w.strip(autocorrect = false, more = more, fixLater = chip && fixes)
+                .map(::shown), emojiFor(w)), token)
+            quick()
+            fun full() = surface?.suggestions(Suggestion.withEmoji(w.strip(fixes, nearWords = true, more = more).map {
                 if (it.kind == Suggestion.Kind.Fix && feedback.blocked(w.decoder.model.language, token, it.text))
                     Suggestion(it.text, Suggestion.Kind.Word) else it
-            }.map(::shown), emojiFor(w)))
+            }.map(::shown), emojiFor(w)), token)
             // Labs › Keyboard › Neural autocorrect: the completions, ranked by the model once it has read them, take
             // their places in whichever strip is showing by then.
             w.rankCompletions({ main.post(it) }) {
