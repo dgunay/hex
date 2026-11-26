@@ -314,6 +314,13 @@ Each setting's commits still use the names it had when it was added. Commit hash
     75 and 12 ms. 4 threads were faster typically but stalled up to 200 ms; 6 were slower.
   - Memory: 224 MB while loaded. The weights are read, not mapped: the CPU backend keeps a repacked copy for its
     dot-product kernels (twice as fast), and a mapped file stayed resident beside it (334 MB).
+- **Asked ahead:** after each letter, once the strip is drawn, the decoder makes the decision space would make
+  now, with a stand-in scorer that only notes the words it would ask the model about (`TypingWord.prescore`). Those
+  are read in the background, before the strip's, so space usually finds every cost already read and waits for none.
+  The costs are the model's for the same words after the same text, so the correction is the same
+  (`theWordsSpaceAsksAboutAreAskedAhead`). A missed space's reading, which space only asks about after the model's
+  first answer, still waits. Background reads go 4 words at a time (12 before), so a space typed straight after a
+  letter waits behind at most 4.
 - **Limits:**
   - English only. It needs the 145 MB download and keeps 224 MB in memory while loaded.
   - The weight isn't tuned yet, and the gate's short Tatoeba sentences can't show what longer context or

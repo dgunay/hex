@@ -108,6 +108,39 @@ class NeuralAutocorrectTest {
         assertTrue("in another sentence the old answer doesn't hold", w.strip(autocorrect = false).map { it.text }.let { "gonna" !in it })
     }
 
+    /** Keeps what was asked ahead apart from what space asks, and answers both the same. */
+    private class Ahead(val likely: Set<String>) : SpatialDecoder.NeuralScorer {
+        val ahead = mutableListOf<Pair<String, List<String>>>()
+        val asked = mutableListOf<Pair<String, List<String>>>()
+        override fun costs(context: String, words: List<String>): DoubleArray {
+            asked += context to words
+            return DoubleArray(words.size) { if (words[it].lowercase() in likely) 5.0 else 30.0 }
+        }
+        override fun costsLater(context: String, words: List<String>, kind: String, answer: (DoubleArray) -> Unit) {
+            if (kind == NeuralAutocorrect.AHEAD) ahead += context to words
+        }
+    }
+
+    @Test fun theWordsSpaceAsksAboutAreAskedAhead() {
+        for ((before, typed, likely) in listOf(Triple("I want to ", "biy", "buy"), Triple("My home server runs on ", "tailscale", "tailscale"),
+                Triple("Wow, ", "thatshcrazy", "that's crazy"), Triple("", "Helo", "hello"))) {
+            val stand = Ahead(setOf(likely))
+            val w = TypingWord(SpatialDecoder(model).also { it.strong = true; it.neural = stand }, true)
+            w.reset(before)
+            for (c in typed) grid.centres.getValue(c.lowercaseChar()).let { w.letter(c.toString(), it.x, it.y, grid) }
+            w.prescore()
+            assertTrue("asked ahead for $typed", stand.ahead.isNotEmpty())
+            stand.asked.clear()
+            val withAhead = w.finish()
+            assertEquals("space's first question is the one asked ahead, for $typed", stand.ahead.first(), stand.asked.first())
+            // And the same word decided with no question ahead: the same correction.
+            val plain = TypingWord(SpatialDecoder(model).also { it.strong = true; it.neural = Ahead(setOf(likely)) }, true)
+            plain.reset(before)
+            for (c in typed) grid.centres.getValue(c.lowercaseChar()).let { plain.letter(c.toString(), it.x, it.y, grid) }
+            assertEquals("asking ahead changes nothing for $typed", plain.finish(), withAhead)
+        }
+    }
+
     @Test fun theModelRanksTheNextWords() {
         val w = TypingWord(SpatialDecoder(model), true)
         val before = "I need to pick up my "

@@ -238,7 +238,8 @@ internal class SpatialDecoder(val model: TypingModel) {
      * the model scores the readings and the spelling as typed in place of the word pairs ([capital]: the word is
      * scored with its first letter capitalised, as typed). */
     fun decide(typed: String, taps: List<Tap>, previous: Int, swears: Boolean, context: String? = null,
-               capital: Boolean = false): Decision {
+               capital: Boolean = false, scorer: NeuralScorer? = neural): Decision {
+        val neural = scorer
         val none = Decision(null, emptyList())
         if (typed.length !in 2..32 || taps.size != typed.length || model.neverSuggest.blocks(typed, swears, previous) ||
             typed.any { model.code(it) == 0 || it == '\'' }) return none
@@ -311,7 +312,6 @@ internal class SpatialDecoder(val model: TypingModel) {
         }
         // The missed-space fallback below weighs its words' pairs against the spelling's word-pair cost.
         val pairCost = cost
-        val neural = neural
         // The model's own cost of the spelling as typed, in nats, once it has scored the readings.
         var modelTyped: Double? = null
         if (neural != null && context != null && readings.isNotEmpty()) rescore(neural, context, capital, typed, lmWeight * lm, cost, readings)

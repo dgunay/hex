@@ -27,6 +27,8 @@ internal object NeuralAutocorrect : SpatialDecoder.NeuralScorer {
     // stalled up to 200 ms, as the work landed on its slower cores, and 6 were slower.
     private const val THREADS = 2
     private const val KEPT_TIMES = 200
+    /** [costsLater]'s kind for [TypingWord.prescore]'s words, read before the strip's. */
+    const val AHEAD = "ahead"
 
     @Volatile private var enabled = false
     @Volatile var budgetMs = TypingPreferences.NEURAL_BUDGET_DEFAULT.toLong()
@@ -125,10 +127,15 @@ internal object NeuralAutocorrect : SpatialDecoder.NeuralScorer {
             val started = SystemClock.elapsedRealtime()
             val behind = running
             var ranAt = 0L
+            var read = missing.size
             val job: Future<Boolean> = worker.submit<Boolean> {
                 ranAt = SystemClock.elapsedRealtime()
-                val out = run("space") { m.costs(context, missing) } ?: return@submit false
-                synchronized(memo) { if (memoContext == context) missing.indices.forEach { memo[missing[it]] = out[it] } }
+                // What the batch it waited behind (the words asked for ahead of it) has read meanwhile isn't read again.
+                val still = synchronized(memo) { if (memoContext == context) missing.filter { it !in memo } else missing }
+                read = still.size
+                if (still.isEmpty()) return@submit true
+                val out = run("space") { m.costs(context, still) } ?: return@submit false
+                synchronized(memo) { if (memoContext == context) still.indices.forEach { memo[still[it]] = out[it] } }
                 true
             }
             val answered = try { job.get(budgetMs, TimeUnit.MILLISECONDS) } catch (_: TimeoutException) { null } catch (_: Exception) { false }
@@ -137,7 +144,7 @@ internal object NeuralAutocorrect : SpatialDecoder.NeuralScorer {
             TypingLog.event {
                 val queued = if (ranAt > 0) ranAt - started else ended - started
                 "neural space ${ended - started}ms: queued ${queued}ms" + (behind?.let { " behind $it" } ?: "") +
-                    (if (ranAt > 0) ", ran ${ended - ranAt}ms" else ", not started") + " for ${missing.size} of ${words.size} words" +
+                    (if (ranAt > 0) ", ran ${ended - ranAt}ms" else ", not started") + " for $read of ${words.size} words" +
                     (if (answered == null) ", too late" else "")
             }
             if (answered != true) return null
@@ -146,14 +153,19 @@ internal object NeuralAutocorrect : SpatialDecoder.NeuralScorer {
     }
 
     private class Later(val context: String, val words: List<String>, val kind: String, val answer: (DoubleArray) -> Unit)
+    // The latest request for the words space will ask about ([TypingWord.prescore]), and the latest of the rest (the
+    // strip's); the first goes first.
+    private val nextAhead = AtomicReference<Later?>(null)
     private val nextLater = AtomicReference<Later?>(null)
     private val laterQueued = AtomicBoolean(false)
+    /** The most words read in one task: space's word, when it comes, waits behind at most this many. */
+    private const val BATCH = 4
 
     override fun costsLater(context: String, words: List<String>, kind: String, answer: (DoubleArray) -> Unit) {
         lastUse = SystemClock.elapsedRealtime()
         if (model == null) return
-        nextLater.set(Later(context, words, kind, answer))
-        // One request queued at a time, the latest: the completions of a word typed on are never decoded.
+        (if (kind == AHEAD) nextAhead else nextLater).set(Later(context, words, kind, answer))
+        // One request of each queued at a time, the latest: the completions of a word typed on are never decoded.
         if (laterQueued.compareAndSet(false, true)) worker.execute(::later)
     }
 
@@ -161,22 +173,26 @@ internal object NeuralAutocorrect : SpatialDecoder.NeuralScorer {
     // asked for meanwhile; the answer once all are read. A newer request takes the place of the rest.
     private fun later() {
         laterQueued.set(false)
-        val later = nextLater.getAndSet(null) ?: return
-        val m = model ?: return
+        val slot = if (nextAhead.get() != null) nextAhead else nextLater
+        val later = slot.getAndSet(null)
+        val m = model
+        if (later != null && m != null) work(m, later, slot)
+        if ((nextAhead.get() != null || nextLater.get() != null) && laterQueued.compareAndSet(false, true)) worker.execute(::later)
+    }
+
+    private fun work(m: NeuralModel, later: Later, slot: AtomicReference<Later?>) {
         val missing = synchronized(memo) {
             if (memoContext != later.context) { memo.clear(); memoContext = later.context }
             later.words.filter { it !in memo }.distinct()
         }
         if (missing.isNotEmpty()) {
-            val batch = missing.take(12)
+            val batch = missing.take(BATCH)
             val started = SystemClock.elapsedRealtime()
             val out = run("${later.kind} batch") { m.costs(later.context, batch) } ?: return
             TypingLog.event { "neural ${later.kind} batch ${SystemClock.elapsedRealtime() - started}ms for ${batch.size} words" }
             synchronized(memo) { if (memoContext == later.context) batch.indices.forEach { memo[batch[it]] = out[it] } }
-            if (missing.size > batch.size) {
-                if (nextLater.compareAndSet(null, later) && laterQueued.compareAndSet(false, true)) worker.execute(::later)
-                return
-            }
+            // The rest next time round, unless a newer request has taken its place.
+            if (missing.size > batch.size) { slot.compareAndSet(null, later); return }
         }
         val costs = synchronized(memo) {
             if (memoContext != later.context) null else DoubleArray(later.words.size) { memo[later.words[it]] ?: Double.NaN }

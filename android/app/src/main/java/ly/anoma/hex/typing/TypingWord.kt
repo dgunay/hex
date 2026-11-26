@@ -335,6 +335,28 @@ internal class TypingWord(val decoder: SpatialDecoder, val spatial: Boolean) {
         }
     }
 
+    /** Labs › Keyboard › Neural autocorrect: the words space will ask the model about, if it comes now, asked for ahead of
+     * it, so space finds their costs already read and decides without waiting. The decision is made as space makes it,
+     * with a scorer that only notes what it is asked and answers nothing; space asks again and gets the same costs. Only
+     * the first question is known ahead: a missed space's reading, which space asks about after the model's answer,
+     * still waits. Returns how long the decoder took, in ms, or null when there was nothing to ask. */
+    fun prescore(): Long? {
+        val neural = decoder.neural?.takeIf { it.active } ?: return null
+        if (!spatial || standIn || literalOnly || model.language != "en" || token.length !in 2..MAX_LENGTH || taps.size != token.length) return null
+        val started = System.nanoTime()
+        val asked = ArrayList<Pair<String, List<String>>>()
+        val noter = object : SpatialDecoder.NeuralScorer {
+            override fun costs(context: String, words: List<String>): DoubleArray? { asked += context to words; return null }
+        }
+        val typed = lookup(token.lowercase()); val capital = token.first().isUpperCase()
+        decoder.decide(typed, taps, previous, suggestSwearWords, before, capital, noter)
+        // Adaptive touch's guard decides again on the drawn centres (guarded).
+        if (personalized && adaptive?.guards != false) decoder.decide(typed, drawn, previous, suggestSwearWords, before, capital, noter)
+        val took = (System.nanoTime() - started) / 1_000_000
+        for ((context, words) in asked) neural.costsLater(context, words, NeuralAutocorrect.AHEAD) {}
+        return if (asked.isEmpty()) null else took
+    }
+
     /** Labs › Keyboard › Neural autocorrect: as [rankCompletions], for the words [predictions] offers after a space
      * in the middle of a sentence: the word pairs' likeliest after the word before and the commonest words,
      * [NEURAL_COMPLETIONS] in all, read with the whole text before them. */
