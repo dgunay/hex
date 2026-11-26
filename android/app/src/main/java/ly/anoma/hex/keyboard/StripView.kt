@@ -93,8 +93,6 @@ internal class StripView(context: Context, private val ime: HexKeyboard, private
     // Labs › Keyboard › Emoji search: back to the panel, what was typed, and the emoji found, scrolling, in the slots' place.
     private val searchRow = LinearLayout(context)
     private val searchQuery = TextView(context)
-    private val searchScroll = HorizontalScrollView(context)
-    private val searchResults = LinearLayout(context)
     private var searchShown: String? = null
     private val noticeRow = LinearLayout(context)
     private val noticeText = TextView(context)
@@ -166,14 +164,10 @@ internal class StripView(context: Context, private val ime: HexKeyboard, private
             LinearLayout.LayoutParams(dp(40), -1))
         searchQuery.apply {
             useInter(500); setTextSize(TypedValue.COMPLEX_UNIT_DIP, 15f); maxLines = 1; ellipsize = TextUtils.TruncateAt.START
-            gravity = Gravity.CENTER_VERTICAL; setPadding(dp(4), 0, dp(10), 0); maxWidth = dp(150)
+            gravity = Gravity.CENTER_VERTICAL; setPadding(dp(4), 0, dp(10), 0)
             accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
         }
-        searchRow.addView(searchQuery, LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, -1))
-        searchScroll.isHorizontalScrollBarEnabled = false; searchScroll.overScrollMode = OVER_SCROLL_NEVER
-        searchResults.orientation = LinearLayout.HORIZONTAL; searchResults.gravity = Gravity.CENTER_VERTICAL
-        searchScroll.addView(searchResults, FrameLayout.LayoutParams(LayoutParams.WRAP_CONTENT, -1))
-        searchRow.addView(searchScroll, LinearLayout.LayoutParams(0, -1, 1f))
+        searchRow.addView(searchQuery, LinearLayout.LayoutParams(0, -1, 1f))
         searchRow.visibility = GONE
         idleRow.addView(searchRow, LinearLayout.LayoutParams(0, -1, 1f))
         for (i in 0..2) {
@@ -404,25 +398,13 @@ internal class StripView(context: Context, private val ime: HexKeyboard, private
         measurePaint.textSize = dpToPx(StripText.SIZE, resources.displayMetrics)
         return measurePaint.measureText(word.text, 0, word.text.length)
     }
-    /** Labs › Keyboard › Emoji search: the search line with [query] and the emoji it found, or none for a null [query]. */
-    fun emojiSearch(query: String?, results: List<String>) {
-        val was = searchShown
+    /** Labs › Keyboard › Emoji search: the search line with [query] (the emoji found show in the grid under it), or none
+     * for a null [query]. */
+    fun emojiSearch(query: String?) {
         searchShown = query
         if (query != null) {
             searchQuery.text = query.ifEmpty { context.getString(R.string.keyboard_emoji_search) }
             searchQuery.setTextColor(if (query.isEmpty()) quiet else ink)
-            searchResults.removeAllViews()
-            if (query.isNotBlank() && results.isEmpty()) searchResults.addView(TextView(context).apply {
-                text = context.getString(R.string.keyboard_emoji_search_none); useInter(450); setTextColor(quiet)
-                setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14f); gravity = Gravity.CENTER_VERTICAL; setPadding(dp(6), 0, dp(6), 0)
-            }, LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, -1))
-            for (e in results) searchResults.addView(TextView(context).apply {
-                text = e; setTextSize(TypedValue.COMPLEX_UNIT_DIP, 24f); gravity = Gravity.CENTER; includeFontPadding = false
-                minWidth = dp(44); isFocusable = true; contentDescription = e
-                background = pressable(android.graphics.Color.TRANSPARENT)
-                setOnClickListener { ime.engine.pickSearchedEmoji(e) }
-            }, LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, -1))
-            if (was != query) searchScroll.scrollTo(0, 0)
         }
         update()
     }
@@ -510,6 +492,7 @@ internal class StripView(context: Context, private val ime: HexKeyboard, private
         val searching = idle && !choosing && searchShown != null
         searchRow.visibility = if (searching) VISIBLE else GONE
         if (searching) for (v in listOf(noticeRow, undoBox, inlineArea, slotScroll, toolsRow, statusText)) v.visibility = GONE
+        menuKey.visibility = if (searching) GONE else VISIBLE
         menuKey.text = context.getString(when {
             choosing -> R.string.keyboard_menu_done
             show || shared || chips -> R.string.keyboard_menu_more

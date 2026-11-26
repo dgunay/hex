@@ -725,7 +725,9 @@ internal class KeyboardEngine(
             emoji?.loadIndex { main.post { if (searching === q) showSearch() } }
             surface?.emojiSearch(q.toString(), emptyList()); return
         }
-        surface?.emojiSearch(q.toString(), if (q.isBlank()) emptyList() else index.search(q.toString(), SEARCH_RESULTS).map(index::emoji))
+        // Before a word is typed, the grid holds Recently used, else the index's first emoji (the smileys).
+        val start = { recentEmoji().ifEmpty { (0 until minOf(SEARCH_RESULTS, index.size)).map(index::emoji) }.take(SEARCH_RESULTS) }
+        surface?.emojiSearch(q.toString(), if (q.isBlank()) start() else index.search(q.toString(), SEARCH_RESULTS).map(index::emoji))
     }
     /** A found emoji tapped: it goes in, and the search stays for another. */
     fun pickSearchedEmoji(text: String) {
@@ -735,6 +737,8 @@ internal class KeyboardEngine(
     }
     /** An emoji went in from a search: the panel's Recently used learns it. */
     var onEmojiPicked: (String) -> Unit = {}
+    /** The emoji panel's Recently used, newest first. */
+    var recentEmoji: () -> List<String> = { emptyList() }
 
     /** Labs › Keyboard › Emoji shortcodes, where the field is one to suggest in. */
     private fun shortcodes() = feedback.emojiShortcodes && !secure && !keyEventEditor && emoji != null

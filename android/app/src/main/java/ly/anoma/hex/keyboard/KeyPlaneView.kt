@@ -667,6 +667,7 @@ internal class KeyPlaneView(context: Context, private val ime: HexKeyboard, priv
     private val recents by lazy { RecentEmoji(context) { ime.engine.learnsTyping } }
     /** An emoji Labs › Keyboard › Emoji search put in: Recently used learns it, as a pick in the panel. */
     fun recordEmoji(emoji: String) = recents.recordSelection(emoji)
+    fun recentEmoji() = recents.recent()
     /** The panel's bottom row: ABC, 🔍 with [search], the space bar and delete. */
     private fun layEmojiBottom(search: Boolean) {
         if (emojiSearchShown == search) return
