@@ -467,6 +467,8 @@ internal class KeyPlaneView(context: Context, private val ime: HexKeyboard, priv
         comma.longClickLabel = if (page.more) context.getString(R.string.keyboard_more_characters) else null
         comma.setOnLongClickListener(if (page.more) commaHolds else null)
         comma.isLongClickable = page.more
+        // SwiftKey layout: held on the letters, comma dictates, and shows a microphone in its corner as SwiftKey's does.
+        comma.hintIcon(if (swiftKey && !symbols) R.drawable.ic_mic else null)
         comma.contentDescription = when (commaLabel) {
             "@" -> context.getString(R.string.keyboard_at)
             "/" -> context.getString(R.string.keyboard_slash)

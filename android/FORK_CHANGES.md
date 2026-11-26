@@ -84,7 +84,8 @@ Each setting's commits still use the names it had when it was added. Commit hash
     A sideways slide opens it at once, with no wait for the hold, and the finger already picks: a flick one key
     left types `,`, two `!`, one right `?`.
   - **Held comma:** on the letters, a dictation as the Hex key held starts one (after 350 ms), finished when the comma
-    lifts; it types no comma. SwiftKey's comma holds its voice typing.
+    lifts; it types no comma. SwiftKey's comma holds its voice typing. A microphone in its corner says so
+    (`KeyCap.hintIcon`), as SwiftKey's does.
   - **123 page:** digits; `@ # $ & _ - ( ) = %`; then `{&=`, `" * ' : / ! ? +` and delete. Its bottom row
     has no emoji key: ABC, comma, a wider space, period, enter.
   - **{&= page:** `£ € ¥ ¢ © ® ™ ~ ¿`; Tab, `[ ] { } < > ^ ¡`; then 123, `` ` ; ÷ \ | ¦ ¬ `` and delete; and
@@ -96,7 +97,6 @@ Each setting's commits still use the names it had when it was added. Commit hash
   - Taken from screenshots of SwiftKey on one phone; the symbol pages' keys aren't sized exactly as SwiftKey's.
   - A local currency (Labs) takes $'s place on x and the 123 page, and $ takes its slot on {&=, as on Gboard's
     pages.
-  - The comma has no microphone hint, as SwiftKey's does.
 
 ## Delete
 

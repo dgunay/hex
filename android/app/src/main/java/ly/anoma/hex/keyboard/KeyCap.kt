@@ -34,6 +34,8 @@ internal class KeyCap(context: Context, fill: Int, private val paints: KeyPaints
     /** The system's key click this key plays as it goes down, when the system's Touch sounds are on. */
     var sound = AudioManager.FX_KEYPRESS_STANDARD
     private var hint: TextView? = null
+    /** An icon in the hint's corner instead of a character (SwiftKey layout's microphone on comma). */
+    private var hintIcon: ImageView? = null
     /** TalkBack types a text entry key as the finger lifts from it (its Typing preference, as for Gboard's
      * keys); switches and enter take a double tap. */
     var textEntry = true
@@ -85,6 +87,18 @@ internal class KeyCap(context: Context, fill: Int, private val paints: KeyPaints
         h.text = text; h.visibility = VISIBLE
     }
 
+    /** [res] small in the hint's corner, sized as a hint character, in the hint's colour; null takes it away. */
+    fun hintIcon(res: Int?) {
+        if (res == null) { if (hintIcon?.visibility == VISIBLE) { hintIcon?.visibility = GONE; requestLayout() }; return }
+        val i = hintIcon ?: ImageView(context).apply {
+            imageTintList = android.content.res.ColorStateList.valueOf(paints.quiet)
+            importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
+            face.addView(this, LayoutParams(0, 0, Gravity.TOP or Gravity.END))
+        }.also { hintIcon = it }
+        if (i.visibility != VISIBLE) requestLayout()
+        i.setImageResource(res); i.visibility = VISIBLE
+    }
+
     // The label and hint are sized for the keycap here, before they are measured: KeyRowLayout has set the
     // padding that places the keycap inside the touch target.
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
@@ -103,14 +117,25 @@ internal class KeyCap(context: Context, fill: Int, private val paints: KeyPaints
         if (width <= 0 || height <= 0) return
         val label = label
         val shown = hint?.takeIf { it.visibility == VISIBLE }
+        val icon = hintIcon?.takeIf { it.visibility == VISIBLE && shown == null }
+        // An icon takes a hint digit's room.
+        val hintShape = shown?.let { shape(it, it.text?.toString().orEmpty()) } ?: icon?.let { label?.let { l -> shape(l, "8") } }
         val sizes = KeyLabels.sizes(width.toFloat(), height.toFloat(), resources.displayMetrics.density, labelBase, labelSize,
-            label?.let { shape(it, it.text?.toString().orEmpty()) }, shown?.let { shape(it, it.text?.toString().orEmpty()) })
+            label?.let { shape(it, it.text?.toString().orEmpty()) }, hintShape)
         if (label != null && label.textSize != sizes.label) label.setTextSize(TypedValue.COMPLEX_UNIT_PX, sizes.label)
         shown?.let { h ->
             if (h.textSize != sizes.hint) h.setTextSize(TypedValue.COMPLEX_UNIT_PX, sizes.hint)
             val params = h.layoutParams as LayoutParams
             val top = sizes.hintTop.roundToInt(); val end = sizes.hintEnd.roundToInt()
             if (params.topMargin != top || params.marginEnd != end) { params.topMargin = top; params.marginEnd = end; h.layoutParams = params }
+        }
+        icon?.let { i ->
+            val params = i.layoutParams as LayoutParams
+            val side = (sizes.hint * 1.05f).roundToInt()
+            val top = sizes.hintTop.roundToInt(); val end = sizes.hintEnd.roundToInt()
+            if (params.width != side || params.topMargin != top || params.marginEnd != end) {
+                params.width = side; params.height = side; params.topMargin = top; params.marginEnd = end; i.layoutParams = params
+            }
         }
     }
     // View normally posts its click after UP. Letter gestures commit on UP itself;
