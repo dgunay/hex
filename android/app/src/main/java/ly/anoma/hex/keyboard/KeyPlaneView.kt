@@ -144,6 +144,13 @@ internal class KeyPlaneView(context: Context, private val ime: HexKeyboard, priv
     private var letterSymbolsDrawn = false
     /** Labs › Keyboard › SwiftKey layout as the keys were last drawn: its letter symbols, bottom row and held period. */
     private var swiftKeyDrawn = false
+    /** SwiftKey layout's comma held into a dictation: lifting it finishes the dictation and types nothing. */
+    private var commaTalking = false
+    private val commaTalk = Runnable {
+        if (!comma.isPressed) return@Runnable
+        commaTalking = ime.beginSpeech()
+        if (commaTalking) comma.isPressed = false
+    }
     /** SwiftKey's {&= page's marks right of its space bar, in the bottom row while that page shows. */
     private val swiftKeyMarks: List<KeyCap>
     private val switchLanguage = Runnable {
@@ -204,9 +211,19 @@ internal class KeyPlaneView(context: Context, private val ime: HexKeyboard, priv
         // On the =< page the key is <, which that page's rows have no room for, so it keeps the holds the <
         // key had there. Elsewhere it is the field's mark or a comma, a plain key as before: the long click
         // is attached only while that page shows (showPage).
+        // Labs › Keyboard › SwiftKey layout: held on the letters, comma dictates as the Hex key held does, until it lifts.
         typesOnLift(comma, preview = { null },
             holds = { if (current?.more == true) listOf(LetterFeedback.symbolHolds('<')) else emptyList() },
-            type = { option -> if (option != null) ime.engine.type(option) else comma.performClick() })
+            down = { if (swiftKeyDrawn && current?.symbols == false) postDelayed(commaTalk, KeyboardMetrics.TALK_HOLD_MS) },
+            type = { option -> if (option != null) ime.engine.type(option) else comma.performClick() },
+            done = { removeCallbacks(commaTalk); if (commaTalking) { commaTalking = false; ime.finishSpeech() } },
+            cancelled = {
+                removeCallbacks(commaTalk)
+                if (commaTalking) {
+                    commaTalking = false
+                    if (DictationField.cancelledHoldFinishes(ime.isInputViewShown && isShown)) ime.finishSpeech() else ime.cancelSpeech()
+                }
+            })
         bottomSlides[comma] = { ime.engine.type(commaText(current)) }
         // Emoji on the letters; on the symbol pages Gboard's 1234 key, which opens its number pad.
         emojiKey = caps.icon(R.drawable.ic_emoji, context.getString(R.string.keyboard_emoji), caps.key,
@@ -736,7 +753,8 @@ internal class KeyPlaneView(context: Context, private val ime: HexKeyboard, priv
      * options to slide over, and on lifting (or when another key goes down first) [type] with the option
      * chosen, or null for the key's own. */
     private fun typesOnLift(k: KeyCap, preview: () -> String?, holds: () -> List<List<String>>, default: () -> Int = { 0 },
-                            swipes: Boolean = false, down: (MotionEvent) -> Unit = {}, type: (String?) -> Unit, done: () -> Unit = {}) {
+                            swipes: Boolean = false, down: (MotionEvent) -> Unit = {}, type: (String?) -> Unit, done: () -> Unit = {},
+                            cancelled: () -> Unit = done) {
         fun finish(): Boolean {
             // The key types: its touch is no swipe any more.
             if (strokeKey === k && swipe == null) forgetStroke()
@@ -780,7 +798,7 @@ internal class KeyPlaneView(context: Context, private val ime: HexKeyboard, priv
                 }
                 MotionEvent.ACTION_CANCEL -> {
                     if (strokeKey === k) cancelSwipe()
-                    if (roll.up(k)) { v.isPressed = false; clearCallout(); done() }
+                    if (roll.up(k)) { v.isPressed = false; clearCallout(); cancelled() }
                 }
             }
             true
