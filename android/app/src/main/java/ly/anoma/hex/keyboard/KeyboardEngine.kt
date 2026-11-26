@@ -14,6 +14,7 @@ import ly.anoma.hex.speech.Spoken
 import ly.anoma.hex.speech.SpokenText
 import ly.anoma.hex.typing.AdaptiveTouch
 import ly.anoma.hex.typing.Correction
+import ly.anoma.hex.typing.EmojiShortcode
 import ly.anoma.hex.typing.KeyGrid
 import ly.anoma.hex.typing.KeyPoint
 import ly.anoma.hex.typing.LearnedWords
@@ -546,6 +547,7 @@ internal class KeyboardEngine(
      * key that starts a word. A space right after a picked word is swallowed (it still counts towards
      * double-space), and a closing mark takes its place (in a URL field, also / and the other joiners). */
     fun pickSuggestion(text: String) {
+        if (pickShortcode(text)) return
         val w = word ?: return
         if (pickSwiped(text) || pickEarlier(text)) return
         edited()
@@ -646,6 +648,13 @@ internal class KeyboardEngine(
         edited()
         if (value == " ") { space(); return }
         val b = before()
+        // Labs › Keyboard › Emoji shortcodes: a closing ":" puts in the emoji its name names (":fire:" is 🔥).
+        if (value == ":" && shortcodes()) emoji?.index?.let { index ->
+            EmojiShortcode.completion(b, index)?.let { (token, entry) ->
+                clearSpaces(); resetTyping()
+                if (replace(token.text, index.emoji(entry))) { shortcodeShown = emptyList(); showPredictions(before()); inputDone(); return }
+            }
+        }
         val mark = value.length == 1 && TypingWord.endsWord(value[0])
         // A clause-ending mark takes the space a picked suggestion, an autocorrection or a text replacement typed
         // ("Hello,"); in a URL field, so does any mark that joins a word ("github." and "github/", never "github /").
@@ -675,8 +684,38 @@ internal class KeyboardEngine(
         }
         // A mark, digit or Return ends the word as typed; a letter outside a word, or an emoji, is nothing to follow.
         if (value.length == 1 && !value[0].isLetter()) teachEnd(text) else adaptive?.forget()
-        resetTyping(); target.commit(value); showPredictions(if (w != null) before() else null)
+        resetTyping(); target.commit(value)
+        if (!showShortcode()) showPredictions(if (w != null) before() else null)
         inputDone()
+    }
+    /** Labs › Keyboard › Emoji shortcodes, where the field is one to suggest in. */
+    private fun shortcodes() = feedback.emojiShortcodes && !secure && !keyEventEditor && emoji != null
+    /** The emoji the strip offers for a ":name" before the cursor, while it shows them. */
+    private var shortcodeShown: List<String> = emptyList()
+    /** Labs › Keyboard › Emoji shortcodes: the strip offers the emoji a ":name" right before the cursor names or
+     * starts. False when there is none (or the lab is off), and the strip is the caller's to show. The index is read the
+     * first time; once in, the strip is shown again. */
+    private fun showShortcode(): Boolean {
+        shortcodeShown = emptyList()
+        if (!shortcodes()) return false
+        val token = EmojiShortcode.token(before()) ?: return false
+        val index = emoji!!.index
+        if (index == null) {
+            emoji.loadIndex { main.post { if (EmojiShortcode.token(before()) == token) showShortcode() } }
+            return false
+        }
+        shortcodeShown = EmojiShortcode.matches(token, index).map(index::emoji)
+        if (shortcodeShown.isEmpty()) return false
+        surface?.suggestions(shortcodeShown.map { Suggestion(it, Suggestion.Kind.Word) })
+        return true
+    }
+    /** A strip tap on a shortcode's emoji: it takes the ":name"'s place. */
+    private fun pickShortcode(text: String): Boolean {
+        if (text !in shortcodeShown || !shortcodes()) return false
+        val token = EmojiShortcode.token(before()) ?: return false
+        edited(); clearSpaces(); resetTyping()
+        if (replace(token.text, text)) { shortcodeShown = emptyList(); showPredictions(before()); inputDone() }
+        return true
     }
     fun delete() {
         if (!target.connected) return
@@ -715,7 +754,7 @@ internal class KeyboardEngine(
             if (!(if (cluster > 1) target.deleteBefore(cluster) else target.deleteCodePointsBefore(1))) target.sendKey(KeyEvent.KEYCODE_DEL)
             if (!track) resetTyping()
         }
-        if (w != null && w.token.isNotEmpty()) showSuggestions(w) else surface?.suggestions(emptyList())
+        if (w != null && w.token.isNotEmpty()) showSuggestions(w) else if (!showShortcode()) surface?.suggestions(emptyList())
     }
     /** Text went in through the editor's own paste (the strip's Paste tool): the word in progress is not
      * what is before the cursor any more. */

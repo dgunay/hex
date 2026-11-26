@@ -4,6 +4,7 @@ import android.content.res.AssetManager
 import android.graphics.Paint
 import java.io.IOException
 import java.util.concurrent.Executor
+import ly.anoma.hex.typing.EmojiIndex
 import ly.anoma.hex.typing.EmojiKeywords
 
 /** The bundled English emoji words, read once and lazily, off the typing path. The keyboard holds
@@ -14,6 +15,29 @@ internal class EmojiWords(private val assets: AssetManager, private val backgrou
     /** Whether a read was started; a failed read stays requested and is never retried. */
     @Volatile var requested = false
         private set
+
+    /** iPhone Hex's whole emoji index, for Labs › Keyboard › Emoji shortcodes and Emoji search, once [loadIndex] has
+     * read it; a failed read stays null and is never retried. */
+    @Volatile var index: EmojiIndex? = null
+        private set
+    @Volatile private var indexRequested = false
+
+    /** Reads the index on [background] the first time, then calls [ready] there. */
+    fun loadIndex(ready: () -> Unit) {
+        synchronized(this) { if (indexRequested) return; indexRequested = true }
+        background.execute {
+            index = try {
+                // Emoji newer than Android 12's 13.1 only where this phone's font draws them.
+                val paint = Paint()
+                assets.open(EmojiIndex.ASSET).bufferedReader(Charsets.UTF_8).use {
+                    EmojiIndex.parse(it.lineSequence()) { emoji -> paint.hasGlyph(emoji) }
+                }
+            } catch (_: IOException) {
+                null
+            }
+            ready()
+        }
+    }
 
     /** [word]'s emoji for a typing model in [language] when the list is in memory, else null. */
     fun match(word: String, language: String): String? = keywords?.match(word, language)

@@ -263,6 +263,28 @@ Each setting's commits still use the names it had when it was added. Commit hash
   - Built for ARMv8.2 with dot product (every recent phone). Emulators that translate ARM can't run it.
 - **Commit:** Android Keyboard: Neural autocorrect, a small language model reading the sentence (Labs).
 
+## Emoji
+
+### Emoji shortcodes (Labs)
+
+- **Switch:** Labs › Keyboard › Emoji shortcodes (off).
+- **What:** type a colon and a name, such as `:fire`, and the strip offers its emoji (🔥, then others the name
+  starts or describes: `:piz` offers 🍕). Tap one to put it in place of the `:name`, or type the closing colon
+  (`:fire:`) for the emoji the name names exactly.
+- **Why:** finding an emoji meant scrolling the AndroidX picker's categories by eye. iPhone Hex has the same lab.
+- **How:**
+  - `typing/EmojiIndex.kt` reads iPhone Hex's emoji index (`assets/emoji/index-en.txt`, copied from
+    `ios/HEXShared/FullKeyboard/Emoji/emoji-index-en.txt`: Unicode's names and CLDR keywords, Unicode License v3,
+    plus Hex's chat words), loaded the first time a shortcode is typed. Emoji newer than Android 12's Emoji 13.1
+    are kept only where the phone's font draws them.
+  - `EmojiShortcode` ports iPhone Hex's rules: a token is a colon after whitespace or the field's start, then a
+    name of two or more letters or digits, so `abc:pizza`, `:p`, `:-D` and `10:30` stay text. Exact names and
+    aliases come first, then the names and keywords the token starts, one emoji per family.
+  - `KeyboardEngine` shows them in the strip after each key, takes a pick over the token, and puts in the exact
+    match on a closing colon.
+- **Limits:** English names only. Your use doesn't rank them yet.
+- **Commit:** Android Keyboard: Emoji shortcodes (Labs).
+
 ## Dictation
 
 ### Dictation sounds (Labs)
