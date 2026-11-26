@@ -267,6 +267,8 @@ public final class Replay {
             if(stray!=null) decoder.setStrayLetterCost(Double.parseDouble(stray));
             if("false".equals(System.getProperty("hex.typing.splits"))) decoder.setNeuralSplits(false);
         }
+        // Settings › Keyboard › Stronger autocorrect: -Dhex.typing.strong=true.
+        if("true".equals(System.getProperty("hex.typing.strong"))) decoder.setStrong(true);
         TypingWord state=new TypingWord(decoder, true);
         // `--gate` options for Labs › Keyboard › Adaptive touch's checks (quality-gate.py --adaptive): a typist who aims
         // off the centres, and Adaptive touch learning as the keyboard does, or reading a profile learned before.

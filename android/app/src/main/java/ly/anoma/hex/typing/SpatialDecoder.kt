@@ -326,7 +326,10 @@ internal class SpatialDecoder(val model: TypingModel) {
         // with a slip in the second word or three or more words run together (iOS #2244). Never a
         // known spelling or a likelier reading that only missed the margin; not German, whose model
         // is lowercase and whose nouns take their capital in the one-word path.
-        if (replace == null && !knownLiteral && model.language != "de" && typed.length >= 5) {
+        // Stronger autocorrect: a spelling that is no word costs more, so a reading can beat it that the fallback would
+        // beat in turn ("ton find" for "tonfind", where the n is the space: "to find"). The fallback competes with it.
+        val contest = strong && replace != null && best != null
+        if ((replace == null || contest) && !knownLiteral && model.language != "de" && typed.length >= 5) {
             missedSpaceReading(taps, typed, previous, swears, pairCost, splits)?.takeIf { fallback ->
                 // Neural autocorrect: the words a missed space makes, only where the model reads them as no less likely
                 // than the spelling as typed ("tailscale" stays, "thankyou" splits).
@@ -335,7 +338,13 @@ internal class SpatialDecoder(val model: TypingModel) {
                 nats != null && nats.isFinite() && nats <= typedNats
             }?.let { fallback ->
                 val likeliest = shown.firstOrNull()
-                if (likeliest == null || fallback.cost <= likeliest.cost || likeliest.text.equals(fallback.text, ignoreCase = true)) {
+                if (contest) {
+                    if (fallback.cost < best!!.cost && !fallback.text.equals(best.text, ignoreCase = true)) {
+                        replace = fallback.text
+                        shown.removeAll { it.text.equals(fallback.text, ignoreCase = true) }
+                        shown.add(0, fallback)
+                    }
+                } else if (likeliest == null || fallback.cost <= likeliest.cost || likeliest.text.equals(fallback.text, ignoreCase = true)) {
                     replace = fallback.text
                     shown.removeAll { it.text.equals(fallback.text, ignoreCase = true) }
                     shown.add(0, fallback)

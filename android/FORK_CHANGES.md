@@ -97,10 +97,15 @@ Each setting's commits still use the names it had when it was added. Commit hash
   - A word of six letters or more (`TWO_EDITS_FROM`) may be two edits from its reading instead of one.
   - A spelling that is no word at all costs 30 nats (`STRONG_UNKNOWN_COST`) instead of 22, so a real word a
     little further away can beat it.
+  - The missed-space fallback (a letter typed where the space should be, "tonfind" for "to find") still competes
+    with the best reading. Otherwise the higher cost lets a one-space split ("ton find") or a two-edit word
+    ("fitness" for "itnwas") win first, and the fallback never runs. Split bench with Stronger on: stray-letter
+    word errors 17.25% → 16.70% (11.98% → 11.63% with Neural autocorrect), plain sentences unchanged.
 - **Limits:** more unusual words are changed too. For example, "tailscale" becomes "tail scale" and "gunay"
   becomes "Gun at", because a spelling the model doesn't know is now cheaper to replace. Learn new words (below)
   fixes this for words you keep.
 - **Commit:** `89c7797a` Android Keyboard: Stronger autocorrect corrects sloppier typing.
+  The fallback's contest: Android Keyboard: Stronger autocorrect still reads a letter typed for the space.
 
 ### Fix earlier words
 
