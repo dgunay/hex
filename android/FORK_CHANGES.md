@@ -239,6 +239,27 @@ Each setting's commits still use the names it had when it was added. Commit hash
   - Built for ARMv8.2 with dot product (every recent phone). Emulators that translate ARM can't run it.
 - **Commit:** Android Keyboard: Neural autocorrect, a small language model reading the sentence (Labs).
 
+## Dictation
+
+### Dictation sounds (Labs)
+
+- **Switch:** Labs › Dictation › Dictation sounds (off). On, a Sound row picks the set: desktop Hex's seven, in its
+  order and with its names (Classic keys first and chosen, as on desktop, then Kalimba, Click, Soft tone, Wood,
+  Warm synth, Thock). Picking one plays its start and stop.
+- **What:** a sound as the microphone opens, as you finish (✓, letting go of the Hex key, or the 1-minute stop),
+  when ✕ cancels, and when a dictation fails (no microphone, no model, couldn't transcribe). A text that goes in
+  2 s or more after the stop sound plays done, in the sets that have one. Nothing said ends quietly, as on desktop.
+  It works wherever Hex dictates: the keyboard, Home, the Quick Settings sheet and apps' speech requests.
+- **Why:** desktop Hex confirms each step with a sound; Android Hex was silent.
+- **How:** `DictationSounds` plays the sets' WAVs, copied from `resources/audio/sounds/` (Classic mixed down to
+  mono; 770 KB in all), through a `SoundPool` as system sounds (`USAGE_ASSISTANCE_SONIFICATION`), so silent and
+  vibrate modes quiet them and the System volume sets their level; the Sound page's Volume slider (5–100%,
+  100% to start, as Key click volume's: every 10% is 3 dB less) sets theirs below it. `MicCapture` plays each cue. The start sound
+  plays as recording begins, and the samples recorded until it ends, plus 120 ms, are zeroed, so it is never taken
+  for speech or transcribed. Off, nothing is loaded.
+- **Limits:** the first start after the lab turns on can be silent while its set loads.
+- **Commit:** Android: Dictation sounds, desktop Hex's sound sets (Labs).
+
 ## Dictation from another keyboard
 
 ### Voice-only mode answers apps' speech requests

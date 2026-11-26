@@ -74,9 +74,10 @@ private enum class Page(val title: Int) {
     Styles(R.string.settings_style),
     Policy(R.string.settings_privacy_policy), Licences(R.string.settings_licences), Licence(R.string.settings_licences),
     Feedback(R.string.feedback_send_feedback), Diagnostics(R.string.diagnostics),
-    Replacements(R.string.words_replacements), WordsFile(R.string.words_file), KeyColors(R.string.key_color);
+    Replacements(R.string.words_replacements), WordsFile(R.string.words_file), KeyColors(R.string.key_color),
+    Sounds(R.string.dictation_sound);
     val parent get() = when (this) {
-        Diagnostics, KeyColors -> Labs
+        Diagnostics, KeyColors, Sounds -> Labs
         Language, Styles, Replacements, WordsFile -> Dictation
         Layout, Height -> Keyboard
         Policy, Licences -> Privacy
@@ -143,6 +144,12 @@ internal fun HexSettings(setup: Setup, speech: SpeechPreferences, typing: Typing
     // What Automatic dictates in: one language, or with Labs › Automatic listens for the language those it chooses among.
     val automaticChoices = remember(revision, LocalConfiguration.current) { speech.automaticCandidates }
     val listenForLanguage = remember(revision) { speech.listenForLanguage }
+    val dictationSounds = remember(revision) { speech.dictationSounds }
+    val soundSet = remember(revision) { speech.soundSet }
+    val soundVolume = remember(revision) { speech.soundVolume }
+    // While its slider is dragged, the start sound repeats at a steady pace at the level shown, until it is let go.
+    val soundAudition = remember { Audition(450) { DictationSounds.of(context).play(speech.soundSet, DictationCue.Start, late = true) } }
+    DisposableEffect(Unit) { onDispose { soundAudition.stop() } }
     val selectedLanguage = remember(revision) { speech.language }
     val listening = selectedLanguage == null && automaticChoices.size > 1
     val languageList = automaticChoices.joinToString(stringResource(R.string.language_list_separator)) { it.label }
@@ -589,6 +596,17 @@ internal fun HexSettings(setup: Setup, speech: SpeechPreferences, typing: Typing
                                     quickDictation, noteLines = Int.MAX_VALUE) {
                                     QuickDictation.setEnabled(context, it); quickDictation = it
                                 }
+                                Rule()
+                                // Labs › Dictation sounds: off, a dictation makes no sound and nothing is loaded.
+                                Toggle(stringResource(R.string.dictation_sounds), stringResource(R.string.dictation_sounds_detail),
+                                    dictationSounds, noteLines = Int.MAX_VALUE) {
+                                    speech.dictationSounds = it
+                                    DictationSounds.of(context).prepare()
+                                }
+                                if (dictationSounds) {
+                                    Rule(); Entry(stringResource(R.string.dictation_sound), value = stringResource(soundSet.label),
+                                        action = { open(Page.Sounds) })
+                                }
                             }
                             Label(stringResource(R.string.labs_output), muted = true, size = 14,
                                 mod = Modifier.padding(start = 16.dp))
@@ -739,6 +757,29 @@ internal fun HexSettings(setup: Setup, speech: SpeechPreferences, typing: Typing
                         KeyboardHeight.entries.forEachIndexed { i, it ->
                             if (i != 0) Rule()
                             Entry(stringResource(it.label), value = if (it == height) "✓" else "", action = { typing.height = it; open(Page.Keyboard) })
+                        }
+                    }
+                    // Desktop Hex's sets, in its order; picking one plays its start and stop, as a dictation would. The
+                    // volume above them plays the stop as it moves.
+                    Page.Sounds -> Column {
+                        Card {
+                            SettingSlider(stringResource(R.string.dictation_sound_volume), soundVolume, 5..100, step = 5, last = true,
+                                finished = soundAudition::stop,
+                            change = { speech.soundVolume = it; DictationSounds.of(context).levelChanged(); soundAudition.start() })
+                        }
+                        Spacer(Modifier.height(16.dp))
+                        Card {
+                            SoundSet.entries.forEachIndexed { i, it ->
+                                if (i != 0) Rule()
+                                Entry(stringResource(it.label), stringResource(it.character), value = if (it == soundSet) "✓" else "",
+                                    action = {
+                                        speech.soundSet = it
+                                        val sounds = DictationSounds.of(context)
+                                        sounds.prepare()
+                                        val start = sounds.play(it, DictationCue.Start, late = true)
+                                        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({ sounds.play(it, DictationCue.Stop) }, start + 450)
+                                    })
+                            }
                         }
                     }
                     Page.KeyColors -> Card {

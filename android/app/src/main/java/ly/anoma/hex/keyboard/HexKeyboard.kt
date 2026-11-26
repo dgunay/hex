@@ -216,7 +216,7 @@ class HexKeyboard : InputMethodService() {
         neuralChanged()
         contentResolver.registerContentObserver(UserDictionary.Words.CONTENT_URI, true, dictionaryChanged)
         capture = MicCapture(LocalSpeech(applicationContext), DictationPlace.Keyboard, update = ::showStatus, meter = ::showLevel,
-            insert = ::commitSpeech)
+            insert = ::commitSpeech, sounds = ly.anoma.hex.speech.DictationSounds.of(this))
         // The lab off is the keyboard it always was: never touch the system's subtype list for it.
         if (feedback.voiceOnly) { VoiceOnly.setEnabled(this, true); ly.anoma.hex.speech.VoiceInputActivity.setEnabled(this, true) }
         clipKeeper.sync()

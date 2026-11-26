@@ -42,7 +42,7 @@ class VoiceInputActivity : Activity() {
         })
         capture = MicCapture(LocalSpeech(applicationContext), DictationPlace.Keyboard,
             update = { phase, note -> window.keepAwake(phase); bar.status(phase, speechNote(note) ?: hint(phase)) },
-            meter = bar::setLevel, insert = { text, _, _, _ -> answer(text) })
+            meter = bar::setLevel, insert = { text, _, _, _ -> answer(text) }, sounds = DictationSounds.of(this))
         begin()
     }
 

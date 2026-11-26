@@ -101,6 +101,8 @@ internal class MicCapture(
     private val meter: (Float) -> Unit,
     /** The text, what was heard, the options it was written with and the field number [start] was given. */
     private val insert: (String, String, SpeechOptions, Int) -> Unit,
+    /** Labs › Dictation › Dictation sounds: null where a dictation makes no sound. */
+    private val sounds: DictationSounds? = null,
 ) {
     private class Ticket(val options: SpeechOptions, val field: Int) {
         val job = jobs.incrementAndGet()
@@ -123,6 +125,8 @@ internal class MicCapture(
         var recorded = 0
         var kept = 0
         var spent: SpeechModel.Spent? = null
+        /** When its stop sound played ([soundClock]), 0 for none: Done follows only a slow text. */
+        @Volatile var stopSoundAt = 0L
     }
     private val main = Handler(Looper.getMainLooper())
     private val recorder = Executors.newSingleThreadExecutor { Thread(it, "Hex dictation") }
@@ -143,6 +147,7 @@ internal class MicCapture(
         if (active != null) return
         val ticket = Ticket(options, field)
         active = ticket
+        sounds?.prepare()
         publish(SpeechPhase.Opening)
         // The model loads while the person speaks, not after they let go.
         transcriber.execute {
@@ -166,6 +171,7 @@ internal class MicCapture(
     fun finish() {
         val ticket = active ?: return
         if (ticket.tickAt == 0L) ticket.tickAt = System.nanoTime()
+        if (!ticket.finish) stopSound(ticket)
         ticket.finish = true
         publish(SpeechPhase.Transcribing)
     }
@@ -177,8 +183,16 @@ internal class MicCapture(
         if (ticket != null) {
             ticket.cancelled = true
             active = null
+            sounds?.play(DictationCue.Cancel)
             publish(current())
-        } else cancel()
+        } else {
+            if (queue.isNotEmpty()) sounds?.play(DictationCue.Cancel)
+            cancel()
+        }
+    }
+
+    private fun stopSound(ticket: Ticket) {
+        if (sounds?.play(DictationCue.Stop)?.takeIf { it > 0 } != null) ticket.stopSoundAt = soundClock()
     }
 
     /** The keyboard's field went away: a recording stops as with ✓ and is still transcribed, and nothing of it is shown
@@ -218,10 +232,14 @@ internal class MicCapture(
         if (ticket.cancelled) { publish(current()); return@post }
         ticket.done = true; ticket.note = note; ticket.text = text; ticket.heard = heard; ticket.written = written
         if (ticket !in queue) queue.addLast(ticket)
+        // Labs › Dictation sounds: a failure sounds as it happens; a text that took a while sounds done as it goes in.
+        if (failed(note)) sounds?.play(DictationCue.Error)
         var shown: String? = null
+        var slow = false
         while (queue.firstOrNull()?.done == true) {
             val next = queue.removeFirst()
             if (!next.left) shown = next.note ?: shown
+            if (next.text != null && next.stopSoundAt != 0L && soundClock() - next.stopSoundAt >= DONE_AFTER_STOP_MS) slow = true
             next.text?.let { insert(it, next.heard ?: it, next.written ?: next.options, next.field) }
             next.spent?.let {
                 val times = durations(next, it, if (next.text != null) System.nanoTime() else 0L)
@@ -230,6 +248,7 @@ internal class MicCapture(
                 try { recognizer.timed(times, next.options) } catch (_: Exception) {}
             }
         }
+        if (slow) sounds?.play(DictationCue.Done)
         publish(current(), shown)
     }
 
@@ -292,6 +311,7 @@ internal class MicCapture(
             // Two seconds, so the reader can fall behind while an earlier dictation transcribes.
             .setBufferSizeInBytes(maxOf(minBuffer, rate * 2 * 2)).build()
         var count = 0
+        var quiet = 0
         var voiced = 0
         val edges = SpeechEdges(rate)
         var lastUpdate = 0L
@@ -300,11 +320,15 @@ internal class MicCapture(
             if (!ticket.cancelled && !ticket.finish) {
                 record.startRecording()
                 check(record.recordingState == AudioRecord.RECORDSTATE_RECORDING)
+                // Labs › Dictation sounds: the start sound plays as the microphone opens, and what the microphone hears
+                // of it is left out, so it is never transcribed or taken for speech.
+                quiet = (sounds?.play(DictationCue.Start) ?: 0L).let { if (it > 0) ((it + START_SOUND_MARGIN_MS) * rate / 1000).toInt() else 0 }
                 main.post { if (active === ticket && !ticket.finish) publish(SpeechPhase.Listening) }
             }
             while (!ticket.finish && !ticket.cancelled && count < pcm.size) {
                 val n = record.read(pcm, count, minOf(block, pcm.size - count), AudioRecord.READ_BLOCKING)
                 check(n > 0)
+                if (count < quiet) pcm.fill(0, count, minOf(count + n, quiet))
                 var energy = 0.0
                 for (i in count until count + n) energy += pcm[i].toDouble() * pcm[i]
                 val rms = sqrt(energy / n) / 32768.0
@@ -324,6 +348,8 @@ internal class MicCapture(
         }
         ticket.stoppedAt = System.nanoTime()
         ticket.recorded = count
+        // The 1-minute stop ends the recording as ✓ would, with its sound.
+        if (count == pcm.size && !ticket.finish && !ticket.cancelled) stopSound(ticket)
         val span = speechSpan(edges.first, edges.last, count, rate)
         // Only with "setprop log.tag.HexSpeech DEBUG": how much audio arrived, never the audio or its words.
         if (Log.isLoggable(LOG_TAG, Log.DEBUG)) Log.d(LOG_TAG, "captured $count samples, $voiced voiced, kept ${span.first}..${span.last + 1}")

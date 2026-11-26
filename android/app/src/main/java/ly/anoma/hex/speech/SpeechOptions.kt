@@ -165,6 +165,18 @@ internal class SpeechPreferences(private val context: Context) {
     val phoneLanguage: PhoneLanguage
         get() = phoneLanguage(language, Spoken.matching(typing.getString("layout", null)), systemLocales(context))
             .copy(listensAmong = candidates.takeIf { it.size > 1 } ?: emptyList())
+    /** Labs › Dictation › Dictation sounds, off by default: [DictationSounds] plays [soundSet]'s sounds. */
+    var dictationSounds: Boolean
+        get() = prefs.getBoolean("dictationSounds", false)
+        set(value) { prefs.edit().putBoolean("dictationSounds", value).apply() }
+    /** Dictation sounds' set: Classic, as on desktop Hex, until another is chosen; kept while the lab is off. */
+    var soundSet: SoundSet
+        get() = SoundSet.of(prefs.getString("soundSet", null))
+        set(value) { prefs.edit().putString("soundSet", value.key).apply() }
+    /** Dictation sounds' volume slider, in percent of the System volume's level (5–100, 100 to start). */
+    var soundVolume: Int
+        get() = prefs.getInt("soundVolume", 100).coerceIn(5, 100)
+        set(value) { prefs.edit().putInt("soundVolume", value.coerceIn(5, 100)).apply() }
     // Labs › Automatic listens for the language, off by default.
     var listenForLanguage: Boolean
         get() = prefs.getBoolean("listenForLanguage", false)
