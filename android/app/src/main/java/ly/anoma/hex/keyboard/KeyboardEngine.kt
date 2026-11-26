@@ -439,6 +439,10 @@ internal class KeyboardEngine(
             w.rankCompletions({ main.post(it) }) {
                 if (word === w && w.token == token) { if (!chip || pendingChip != null) quick() else full() }
             }
+            // ...and the readings space would ask it about now, after this letter's strip is drawn, so space finds them read.
+            main.post {
+                if (word === w && w.token == token) w.prescore()?.let { ms -> TypingLog.event { "neural ahead decided in ${ms}ms" } }
+            }
             if (!chip) return
             pendingChip = Runnable {
                 pendingChip = null
