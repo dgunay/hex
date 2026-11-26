@@ -57,6 +57,7 @@ def main():
     parser.add_argument('--neural-lib', type=Path)
     parser.add_argument('--stray-cost', type=float, help="a stray letter's cost beside a missed space (default 4)")
     parser.add_argument('--no-splits', action='store_true', help="the model without its own run-together readings, to compare")
+    parser.add_argument('--strong', action='store_true', help="Settings › Keyboard › Stronger autocorrect on")
     parser.add_argument('--sets', default='control,dropped,stray')
     parser.add_argument('--out', type=Path, default=gate.ANDROID / 'build/split-bench')
     args = parser.parse_args()
@@ -75,13 +76,15 @@ def main():
         command = [jdk / 'java', '-Xmx768m', '-Dfile.encoding=UTF-8', '-cp', str(tmp) + os.pathsep + cp.read_text()]
         if args.neural:
             command[1:1] = ['-Dhex.typing.model=' + str(args.neural.resolve()), '-Dhex.typing.lib=' + str(args.neural_lib.resolve())]
+        if args.strong:
+            command[1:1] = ['-Dhex.typing.strong=true']
         if args.no_splits:
             command[1:1] = ['-Dhex.typing.splits=false']
         if args.stray_cost is not None:
             command[1:1] = [f'-Dhex.typing.stray={args.stray_cost}']
         model = gate.MODELS / 'en.hextm'
         words = sum(map(len, refs))
-        tag = ('neural' if args.neural else 'pairs') + (f'-{args.stray_cost:g}' if args.stray_cost is not None else '') + ('-nosplits' if args.no_splits else '')
+        tag = ('neural' if args.neural else 'pairs') + (f'-{args.stray_cost:g}' if args.stray_cost is not None else '') + ('-nosplits' if args.no_splits else '') + ('-strong' if args.strong else '')
         for name in args.sets.split(','):
             path = tmp / f'{name}.tsv'
             path.write_text('\n'.join(sets[name]) + '\n', encoding='utf-8')
