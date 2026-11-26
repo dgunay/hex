@@ -71,6 +71,11 @@ internal class TypingPreferences(context: Context) {
     var emojiShortcodes: Boolean
         get() = prefs.getBoolean(EMOJI_SHORTCODES, false)
         set(value) { prefs.edit().putBoolean(EMOJI_SHORTCODES, value).apply() }
+    /** Labs › Keyboard › Typing log: keys, picks and the text around the cursor kept on this phone to diagnose
+     * spacing and punctuation. Off by default. */
+    var typingLog: Boolean
+        get() = prefs.getBoolean(TYPING_LOG, false)
+        set(value) { prefs.edit().putBoolean(TYPING_LOG, value).apply() }
     /** Labs › Keyboard › Emoji search: the emoji panel's 🔍 key, whose search the letter keys type into. Off by default. */
     var emojiSearch: Boolean
         get() = prefs.getBoolean(EMOJI_SEARCH, false)
@@ -239,6 +244,7 @@ internal class TypingPreferences(context: Context) {
         const val EMOJI_SUGGESTIONS = "emojiSuggestions"
         const val EMOJI_SHORTCODES = "emojiShortcodes"
         const val EMOJI_SEARCH = "emojiSearch"
+        const val TYPING_LOG = "typingLog"
         const val KEYBOARD_TOOLS = "keyboardTools"
         const val SMART_QUOTES = "smartQuotes"
         const val SWIPE_DELETE_LETTERS = "swipeDeleteLetters"

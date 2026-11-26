@@ -321,6 +321,7 @@ internal class StripView(context: Context, private val ime: HexKeyboard, private
      * otherwise the likeliest word in the middle and the next on the left, as Gboard and iPhone place
      * them. The emoji always keeps the last slot (Labs › Keyboard › Emoji suggestions). */
     fun suggestions(slots: List<Suggestion?>, more: List<Suggestion> = emptyList(), keepScroll: Boolean = false) {
+        TypingLog.event { "strip " + slots.joinToString(" | ") { s -> s?.let { it.kind.name.lowercase() + ":" + it.text } ?: "-" } }
         // Typing or swiping started: the suggestions (a swipe's word so far) matter more than the notice, which comes
         // back in the next field.
         if (slots.any { it?.kind == Suggestion.Kind.Typed } || ime.engine.swiping) notice = null

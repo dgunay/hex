@@ -385,3 +385,21 @@ Each setting's commits still use the names it had when it was added. Commit hash
   this fork dropped its own always-on version and uses upstream's lab.
 - **Haptic strength** (a 10–100% slider for key taps). Removed from the fork as unneeded. Hold delete's heavier
   per-word tap stayed.
+
+## Diagnostics
+
+### Typing log (Labs)
+
+- **Switch:** Labs › Keyboard › Typing log (off), with Delete typing log and its size below it.
+- **What:** a plain-text log, on the phone only, of every key (and where it was tapped), strip pick, swipe, delete,
+  cursor move and suggestion strip, each with the text around the cursor after it, the word being typed, the
+  autocorrection Undo would take back, and which space rules are pending. The Hex menu's **Mark a problem** writes a
+  marker with the text as it is then. Settings changes and each field's app and input type are logged too.
+- **Why:** to find the spacing and punctuation papercuts from a day of natural typing instead of from descriptions.
+- **Privacy:** password fields and fields that ask keyboards not to learn (incognito) are never logged, not even
+  their keys. Files are in the app's private storage (`files/typing-log/`), read with
+  `adb shell run-as ly.anoma.hex cat files/typing-log/*` on this debug build. Up to 200 MB, oldest files dropped.
+- **How:** `TypingLog` writes lines on its own thread. `KeyboardEngine` posts a snapshot after each entry point
+  (`logAfter`), so it sees the text as the event left it; `StripView` logs each strip.
+- **Limits:** a line is two extra reads of the field's text per event, so typing is a little slower while it's on.
+- **Commit:** Android Keyboard: Typing log (Labs).

@@ -167,6 +167,9 @@
     <string name="labs_output">输出</string>
     <string name="labs_keyboard">键盘</string>
     <string name="emoji_suggestions">表情符号建议</string>
+    <string name="typing_log">输入日志</string>
+    <string name="typing_log_detail">在本机记录按键、建议和光标附近的文字，用于查找空格和标点问题。密码和无痕输入框永不记录。最多 200 MB；不会发送到任何地方。可在 Hex 菜单中标记问题。</string>
+    <string name="typing_log_delete">删除输入日志</string>
     <string name="emoji_search">表情符号搜索</string>
     <string name="emoji_search_detail">表情符号面板中的搜索键：输入英文单词（如“laugh”）查找表情符号</string>
     <string name="emoji_shortcodes">表情符号短代码</string>

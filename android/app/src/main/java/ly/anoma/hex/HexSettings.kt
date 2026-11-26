@@ -41,6 +41,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import ly.anoma.hex.keyboard.TypingLog
 import ly.anoma.hex.diagnostics.DiagnosticsPage
 import ly.anoma.hex.feedback.Feedback
 import ly.anoma.hex.feedback.FeedbackForm
@@ -173,6 +174,9 @@ internal fun HexSettings(setup: Setup, speech: SpeechPreferences, typing: Typing
     val emojiSuggestions = remember(revision) { typing.emojiSuggestions }
     val emojiShortcodes = remember(revision) { typing.emojiShortcodes }
     val emojiSearch = remember(revision) { typing.emojiSearch }
+    val typingLog = remember(revision) { typing.typingLog }
+    var typingLogBytes by remember { mutableLongStateOf(0L) }
+    LaunchedEffect(page, revision) { if (page == Page.Labs) { TypingLog.attach(context); typingLogBytes = TypingLog.size() } }
     val keyboardTools = remember(revision) { typing.keyboardTools }
     val clipboardHistory = remember(revision) { typing.clipboardHistory }
     val smartQuotes = remember(revision) { typing.smartQuotes }
@@ -620,6 +624,15 @@ internal fun HexSettings(setup: Setup, speech: SpeechPreferences, typing: Typing
                                 Rule()
                                 Toggle(stringResource(R.string.emoji_search), stringResource(R.string.emoji_search_detail),
                                     emojiSearch) { typing.emojiSearch = it }
+                                Rule()
+                                Toggle(stringResource(R.string.typing_log), stringResource(R.string.typing_log_detail),
+                                    typingLog, noteLines = Int.MAX_VALUE) { typing.typingLog = it }
+                                if (typingLog || typingLogBytes > 0) {
+                                    Rule()
+                                    Entry(stringResource(R.string.typing_log_delete),
+                                        note = android.text.format.Formatter.formatShortFileSize(context, typingLogBytes),
+                                        action = { TypingLog.clear { typingLogBytes = 0 } })
+                                }
                                 Rule()
                                 Toggle(stringResource(R.string.keyboard_tools), stringResource(R.string.keyboard_tools_detail),
                                     keyboardTools) { typing.keyboardTools = it }
