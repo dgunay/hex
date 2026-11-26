@@ -54,6 +54,34 @@ Each setting's commits still use the names it had when it was added. Commit hash
   word scrolls back to the start.
 - **Commit:** Android Keyboard: Steadier suggestion strip, and More suggestions (Labs).
 
+### SwiftKey layout (Labs)
+
+- **Switch:** Labs › Keyboard › SwiftKey layout (off).
+- **What:** Microsoft SwiftKey's arrangement (English QWERTY, Android), for muscle memory carried over from it
+  (anomalyco/hex#2748, closed upstream without a change):
+  - **Held letters:** SwiftKey's symbols, shown as key hints, whether or not Symbols on letter keys is on:
+
+    ```text
+    q w e r t y u i o p    % ^ ~ | [ ] < > { }   (only beside the Number row; otherwise the digits)
+    a s d f g h j k l      @ # & * - + = ( )
+    z x c v b n m          _ $ " ' : ; /
+    ```
+
+  - **Bottom row:** ?123, emoji, comma, space, period, enter (the emoji key before the comma).
+  - **Held period:** one row, `! , . ?`, with the period selected.
+  - **123 page:** digits; `@ # $ & _ - ( ) = %`; then `{&=`, `" * ' : / ! ? +` and delete. Its bottom row
+    has no emoji key: ABC, comma, a wider space, period, enter.
+  - **{&= page:** `£ € ¥ ¢ © ® ™ ~ ¿`; Tab, `[ ] { } < > ^ ¡`; then 123, `` ` ; ÷ \ | ¦ ¬ `` and delete; and
+    ABC, space, `× § ¶ °`, enter.
+- **How:** `LetterFeedback.letterSymbol(swiftKey)`, `KeyboardLetters.swiftKeyNumbers`/`swiftKeySymbols`, and
+  `KeyPlaneView.layBottom`, which moves and hides the bottom row's keys in place (`KeyRowLayout.place`, gone keys
+  take no room) so a finger already on ?123 keeps its press. Tab types a tab character.
+- **Limits:**
+  - Taken from screenshots of SwiftKey on one phone; the symbol pages' keys aren't sized exactly as SwiftKey's.
+  - A local currency (Labs) takes $'s place on x and the 123 page, and $ takes its slot on {&=, as on Gboard's
+    pages.
+  - Holding comma does nothing (SwiftKey's starts voice typing).
+
 ## Delete
 
 ### Delete words when held

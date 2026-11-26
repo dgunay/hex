@@ -42,6 +42,11 @@ internal class TypingPreferences(context: Context) {
     var letterSymbols: Boolean
         get() = prefs.getBoolean("letterSymbols", false)
         set(value) { prefs.edit().putBoolean("letterSymbols", value).apply() }
+    /** Labs › Keyboard › SwiftKey layout: Microsoft SwiftKey's symbols on the letters, its bottom row (emoji before
+     * the comma) and its held period. Off by default. */
+    var swiftKeyLayout: Boolean
+        get() = prefs.getBoolean(SWIFTKEY_LAYOUT, false)
+        set(value) { prefs.edit().putBoolean(SWIFTKEY_LAYOUT, value).apply() }
     /** Labs › Keyboard › Number row: the digits above the letters. Off by default. */
     var numberRow: Boolean
         get() = prefs.getBoolean(NUMBER_ROW, false)
@@ -223,6 +228,7 @@ internal class TypingPreferences(context: Context) {
         const val EMOJI_SHORTCODES = "emojiShortcodes"
         const val EMOJI_SEARCH = "emojiSearch"
         const val TYPING_LOG = "typingLog"
+        const val SWIFTKEY_LAYOUT = "swiftKeyLayout"
         const val KEYBOARD_TOOLS = "keyboardTools"
         const val SMART_QUOTES = "smartQuotes"
         const val SWIPE_DELETE_LETTERS = "swipeDeleteLetters"

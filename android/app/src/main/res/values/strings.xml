@@ -207,6 +207,9 @@
     <string name="signature_detail">Add a line to the end of each dictation, such as “Sent from Hex”</string>
     <string name="signature_one_line">Use one line</string>
     <string name="signature_too_long">Use 200 characters or fewer</string>
+    <string name="keyboard_tab">Tab</string>
+    <string name="swiftkey_layout">SwiftKey layout</string>
+    <string name="swiftkey_layout_detail">Microsoft SwiftKey’s symbols when you hold a letter, its bottom row with emoji before the comma, and its period popup</string>
     <string name="letter_symbols">Symbols on letter keys</string>
     <string name="letter_symbols_detail">Hold a letter to type a symbol, like m for ?</string>
     <string name="number_row">Number row</string>

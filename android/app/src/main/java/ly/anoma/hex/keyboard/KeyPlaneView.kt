@@ -142,6 +142,10 @@ internal class KeyPlaneView(context: Context, private val ime: HexKeyboard, priv
     private var shiftIcon: ImageView? = null
     // The Labs letter-symbol setting the keys were drawn with, so a change draws them when next shown.
     private var letterSymbolsDrawn = false
+    /** Labs › Keyboard › SwiftKey layout as the keys were last drawn: its letter symbols, bottom row and held period. */
+    private var swiftKeyDrawn = false
+    /** SwiftKey's {&= page's marks right of its space bar, in the bottom row while that page shows. */
+    private val swiftKeyMarks: List<KeyCap>
     private val switchLanguage = Runnable {
         if (spaceKey.isPressed && spaceGesture.still) { spaceKey.isPressed = false; spaceKey.performLongClick() }
     }
@@ -253,13 +257,13 @@ internal class KeyPlaneView(context: Context, private val ime: HexKeyboard, priv
         // Held on the letters page, period offers Gboard's punctuation; on ?123 an ellipsis, and on =<
         // what its > holds.
         period.setOnLongClickListener {
-            host.openAccents(if (current?.symbols == false) LetterFeedback.periodHolds.flatten()
+            host.openAccents(if (current?.symbols == false) periodHolds().flatten()
                 else LetterFeedback.symbolHolds(periodText(current)[0]), it); true
         }
         period.longClickLabel = context.getString(R.string.keyboard_more_characters)
         typesOnLift(period, preview = { null },
-            holds = { if (current?.symbols == false) LetterFeedback.periodHolds else listOf(LetterFeedback.symbolHolds(periodText(current)[0])) },
-            default = { if (current?.symbols == false) LetterFeedback.PERIOD_DEFAULT else 0 },
+            holds = { if (current?.symbols == false) periodHolds() else listOf(LetterFeedback.symbolHolds(periodText(current)[0])) },
+            default = { if (current?.symbols == false) (if (swiftKeyDrawn) LetterFeedback.SWIFTKEY_PERIOD_DEFAULT else LetterFeedback.PERIOD_DEFAULT) else 0 },
             type = { option -> if (option != null) ime.engine.type(option) else period.performClick() })
         bottomSlides[period] = { ime.engine.type(periodText(current)) }
         enterKey = caps.cap("", context.getString(R.string.keyboard_return), modifier, 17f, ime.engine::enter)
@@ -269,9 +273,15 @@ internal class KeyPlaneView(context: Context, private val ime: HexKeyboard, priv
         enterIcon.setImageResource(R.drawable.ic_enter)
         enterIcon.imageTintList = ColorStateList.valueOf(ink)
         enterKey.face.addView(enterIcon, FrameLayout.LayoutParams(dp(24), dp(24), Gravity.CENTER))
-        var at = 0f
-        for ((key, width) in listOf(modeKey to KeyboardMetrics.MODE, comma to KeyboardMetrics.COMMA, emojiKey to KeyboardMetrics.EMOJI,
-                spaceKey to KeyboardMetrics.SPACE, period to KeyboardMetrics.PERIOD, enterKey to KeyboardMetrics.ENTER)) { bottom.add(key, at, width); at += width }
+        // SwiftKey's {&= page's four marks right of its space bar (Labs › Keyboard › SwiftKey layout).
+        swiftKeyMarks = KeyboardLetters.SWIFTKEY_MORE_BOTTOM.map { c ->
+            val t = c.toString()
+            caps.cap(t, t) { ime.engine.type(t) }.also { k ->
+                typesOnLift(k, preview = { t }, holds = { emptyList() }, type = { k.performClick() })
+                bottomSlides[k] = { ime.engine.type(t) }
+            }
+        }
+        layBottom(false, null)
         // Gboard's emoji panel ends with ABC and delete; Hex puts a space bar between them.
         val letters = caps.cap(context.getString(R.string.keyboard_letters_label), context.getString(R.string.keyboard_letters),
             modifier, 17f) { host.closeEmoji(); ime.engine.letters() }
@@ -303,7 +313,8 @@ internal class KeyPlaneView(context: Context, private val ime: HexKeyboard, priv
      * A long press's picked alternate goes through [KeyboardEngine.type] instead, so it inserts exactly
      * the character it shows. */
     private fun typeFromKey(text: String, g: KeyGrid?, p: KeyPoint?, aimed: Boolean = true) {
-        if (text.length == 1 && (text[0] == '\'' || text[0] == '"')) ime.engine.quote(text[0])
+        if (text.length == 1 && text[0] == KeyboardLetters.TAB) ime.engine.type("\t")
+        else if (text.length == 1 && (text[0] == '\'' || text[0] == '"')) ime.engine.quote(text[0])
         else if (g != null && p != null) ime.engine.letter(text, p.x, p.y, g, aimed = aimed)
         else ime.engine.type(text)
     }
@@ -313,16 +324,18 @@ internal class KeyPlaneView(context: Context, private val ime: HexKeyboard, priv
     fun showPage(page: KeyboardPage) {
         val shown = current
         val letterSymbols = ime.feedback.letterSymbols
+        val swiftKey = ime.feedback.swiftKeyLayout
         // Shift only recases the letters and changes nothing on the symbol pages: neither draws the keys again,
         // which would drop a key a second finger is already on (typing the first of a sentence turns shift off).
         // A changed Labs letter-symbol setting draws them again, so the next showing picks it up.
         if (shown != null && page.copy(shifted = shown.shifted, locked = shown.locked) == shown &&
-            letterSymbols == letterSymbolsDrawn) {
+            letterSymbols == letterSymbolsDrawn && swiftKey == swiftKeyDrawn) {
             current = page; if (!page.symbols) relabel(page); return
         }
         // Another kind of field in the same box (the app changed its type): the keys, not the emoji panel over them.
         if (emojiOpen) host.closeEmoji()
         current = page; letterSymbolsDrawn = letterSymbols
+        swiftKeyDrawn = swiftKey; layBottom(swiftKey, page)
         clearCallout(); endSlide(); cancelSwipe(); grid = null; letters.clear(); caseKeys.clear(); slides.clear(); shiftIcon = null
         rows.removeAllViews()
         page.pad?.let { showPad(page, it); return }
@@ -330,8 +343,10 @@ internal class KeyPlaneView(context: Context, private val ime: HexKeyboard, priv
         val language = page.language
         val symbols = page.symbols
         val currency = page.currency
-        val letterHolds = !symbols && letterSymbols
-        val lines = page.lines
+        // Labs › Keyboard › SwiftKey layout brings its own symbols on the letters, the Symbols on letter keys lab on or not.
+        val letterHolds = !symbols && (letterSymbols || swiftKey)
+        val lines = if (swiftKey && symbols) (if (page.more) KeyboardLetters.swiftKeySymbols(currency)
+            else KeyboardLetters.swiftKeyNumbers(currency)) else page.lines
         val columns = KeyboardMetrics.columns(lines).toFloat()
         val side = KeyboardMetrics.sideWidth(page, lines)
         // Labs › Keyboard › Number row: the digits above the letters, in a row of their own.
@@ -347,7 +362,9 @@ internal class KeyPlaneView(context: Context, private val ime: HexKeyboard, priv
             val width = if (index < 2) 1f else (columns - 2 * side) / line.length
             if (index == 2) {
                 // Gboard labels the page switch =< going out and ?123 coming back.
-                val switch = if (symbols) caps.cap(context.getString(if (page.more) R.string.keyboard_numbers_label else R.string.keyboard_page_symbols),
+                // SwiftKey's says {&= and 123.
+                val switch = if (symbols) caps.cap(if (swiftKey) (if (page.more) "123" else "{&=")
+                    else context.getString(if (page.more) R.string.keyboard_numbers_label else R.string.keyboard_page_symbols),
                     context.getString(R.string.keyboard_more_symbols), modifier, 15f, ime.engine::shiftUp).also { it.textEntry = false }
                 else caps.icon(shiftIconFor(page), shiftDescription(page), modifier, { ime.engine.shiftDown(); ime.engine.shiftUp() }).also { key ->
                     shiftIcon = key.face.getChildAt(0) as ImageView
@@ -380,17 +397,18 @@ internal class KeyPlaneView(context: Context, private val ime: HexKeyboard, priv
                     typeFromKey(text, g, p, aimed = touch != null && !slidTap)
                 }
                 row.add(k, at, width); at += width
+                if (c == KeyboardLetters.TAB) k.contentDescription = context.getString(R.string.keyboard_tab)
                 if (!symbols) { letters[c] = k; caseKeys.add(c to k) }
                 val digit = if (symbols) null else page.hint(index, position)
                 // Gboard's top-row set is only a fallback for a row-1 letter with no home- or bottom-row
                 // symbol of its own (AZERTY a and z keep @ and *); rows 2 and 3 always keep Gboard's,
                 // wherever a layout draws their letters. A local currency takes $'s place on d.
                 val symbol = if (letterHolds) LetterFeedback.letterSymbol(c, topRow = index == 0,
-                    currency = currency) else null
+                    currency = currency, swiftKey = swiftKey) else null
                 k.hint(digit?.toString() ?: symbol?.toString())
                 fun holds() = if (symbols) LetterFeedback.symbolHolds(c, currency)
                     else LetterFeedback.holds(cased(c).single(), language.layoutCode, digit, letterHolds,
-                        topRow = index == 0, currency = currency)
+                        topRow = index == 0, currency = currency, swiftKey = swiftKey)
                 if (holds().isNotEmpty()) {
                     k.setOnLongClickListener { host.openAccents(holds(), it); true }
                     k.longClickLabel = context.getString(R.string.keyboard_more_characters)
@@ -668,6 +686,29 @@ internal class KeyPlaneView(context: Context, private val ime: HexKeyboard, priv
     /** An emoji Labs › Keyboard › Emoji search put in: Recently used learns it, as a pick in the panel. */
     fun recordEmoji(emoji: String) = recents.recordSelection(emoji)
     fun recentEmoji() = recents.recent()
+    /** The bottom row for [page] (null: the letters): Gboard's ?123, comma, emoji, space, period and enter, or with
+     * Labs › Keyboard › SwiftKey layout ([swiftKey]) SwiftKey's: emoji before the comma on the letters, no emoji
+     * key on 123, and on {&= its four marks in the comma's and period's place. Its keys stay in the row, moved or
+     * hidden, so a finger already on one (?123 switches the page as it goes down) keeps it. */
+    private fun layBottom(swiftKey: Boolean, page: KeyboardPage?) {
+        if (bottom.childCount == 0)
+            (listOf(modeKey, comma, emojiKey, spaceKey, period, enterKey) + swiftKeyMarks).forEach { bottom.add(it, 0f, 0f) }
+        val m = KeyboardMetrics
+        val symbols = page?.symbols == true && page.pad == null
+        val order: List<Pair<View, Float>> = when {
+            !swiftKey -> listOf(modeKey to m.MODE, comma to m.COMMA, emojiKey to m.EMOJI, spaceKey to m.SPACE, period to m.PERIOD, enterKey to m.ENTER)
+            !symbols -> listOf(modeKey to m.MODE, emojiKey to m.EMOJI, comma to m.COMMA, spaceKey to m.SPACE, period to m.PERIOD, enterKey to m.ENTER)
+            page?.more != true -> listOf(modeKey to m.MODE, comma to m.COMMA, spaceKey to m.SPACE + m.EMOJI, period to m.PERIOD, enterKey to m.ENTER)
+            else -> listOf<Pair<View, Float>>(modeKey to m.MODE, spaceKey to 10f - m.MODE - m.ENTER - swiftKeyMarks.size) +
+                swiftKeyMarks.map { it to 1f } + listOf(enterKey to m.ENTER)
+        }
+        val shown = order.map { it.first }.toSet()
+        for (i in 0 until bottom.childCount) bottom.getChildAt(i).let { it.visibility = if (it in shown) VISIBLE else GONE }
+        var at = 0f
+        for ((key, width) in order) { bottom.place(key, at, width); at += width }
+    }
+    private fun periodHolds() = if (swiftKeyDrawn) LetterFeedback.swiftKeyPeriodHolds else LetterFeedback.periodHolds
+
     /** The panel's bottom row: ABC, 🔍 with [search], the space bar and delete. */
     private fun layEmojiBottom(search: Boolean) {
         if (emojiSearchShown == search) return

@@ -238,6 +238,7 @@ internal fun HexSettings(setup: Setup, speech: SpeechPreferences, typing: Typing
     val haptics = remember(revision) { typing.haptics }
     val strongAutocorrect = remember(revision) { typing.strongAutocorrect }
     val letterSymbols = remember(revision) { typing.letterSymbols }
+    val swiftKeyLayout = remember(revision) { typing.swiftKeyLayout }
     val numberRow = remember(revision) { typing.numberRow }
     val snugBottom = remember(revision) { typing.snugBottom }
     val holdDeleteWords = remember(revision) { typing.holdDeleteWords }
@@ -647,6 +648,9 @@ internal fun HexSettings(setup: Setup, speech: SpeechPreferences, typing: Typing
                             Card {
                                 Toggle(stringResource(R.string.letter_symbols), stringResource(R.string.letter_symbols_detail),
                                     letterSymbols) { typing.letterSymbols = it }
+                                Rule()
+                                Toggle(stringResource(R.string.swiftkey_layout), stringResource(R.string.swiftkey_layout_detail),
+                                    swiftKeyLayout, noteLines = Int.MAX_VALUE) { typing.swiftKeyLayout = it }
                                 Rule()
                                 Toggle(stringResource(R.string.number_row), stringResource(R.string.number_row_detail),
                                     numberRow) { typing.numberRow = it }

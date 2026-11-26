@@ -44,4 +44,24 @@ internal object KeyboardLetters {
         }
         return listOf("~`|•√π÷×§Δ", "${money}^°={}\\", "%©®™✓[]")
     }
+
+    /** Labs › Keyboard › SwiftKey layout: Microsoft SwiftKey's 123 page (its English QWERTY, Android): ten digits,
+     * ten marks, and eight keys between the page switch and delete. Its bottom row is abc, comma, space, period. */
+    fun swiftKeyNumbers(currency: Char? = null) =
+        listOf(DIGITS, "@#${currency ?: '$'}&_-()=%", "\"*':/!?+")
+
+    /** SwiftKey's {&= page: nine keys on each upper row, Tab ([TAB]) first on the second, and seven between the 123
+     * switch and delete; [SWIFTKEY_MORE_BOTTOM] sit right of its space bar. A local currency gives up its slot
+     * for $, as on Gboard's page. */
+    fun swiftKeySymbols(currency: Char? = null): List<String> {
+        val money = when {
+            currency == null -> "£€¥¢"
+            currency in "£€¥¢" -> "£€¥¢".replace(currency, '$')
+            else -> "£€$¢"
+        }
+        return listOf("$money©®™~¿", "$TAB[]{}<>^¡", "`;÷\\|¦¬")
+    }
+    const val SWIFTKEY_MORE_BOTTOM = "×§¶°"
+    /** The Tab key's face on SwiftKey's {&= page; it types a tab. */
+    const val TAB = '⇥'
 }

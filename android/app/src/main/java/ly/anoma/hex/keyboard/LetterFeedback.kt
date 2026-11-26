@@ -152,9 +152,9 @@ internal class LetterFeedback(private val host: ViewGroup, private val paints: K
          * letter with no home- or bottom-row symbol of its own. [currency] is Labs › Keyboard › Local
          * currency's symbol, which takes $'s place on d as it does on the ?123 page. */
         fun holds(c: Char, language: String, digit: Char?, symbolsOnLetters: Boolean = false,
-                  topRow: Boolean = false, currency: Char? = null): List<String> {
+                  topRow: Boolean = false, currency: Char? = null, swiftKey: Boolean = false): List<String> {
             val accents = options(c, language)
-            val first = digit?.toString() ?: (if (symbolsOnLetters) letterSymbol(c, topRow, currency)?.toString() else null)
+            val first = digit?.toString() ?: (if (symbolsOnLetters) letterSymbol(c, topRow, currency, swiftKey)?.toString() else null)
             return if (first == null) accents else listOf(first) + accents
         }
 
@@ -169,8 +169,20 @@ internal class LetterFeedback(private val host: ViewGroup, private val paints: K
         // layouts draw them lower.
         private val topRowSymbols = mapOf('q' to '%', 'w' to '\\', 'e' to '|', 'r' to '=', 't' to '[',
             'y' to ']', 'u' to '<', 'i' to '>', 'o' to '{', 'p' to '}')
-        fun letterSymbol(c: Char, topRow: Boolean = false, currency: Char? = null): Char? {
+        // Labs › Keyboard › SwiftKey layout: Microsoft SwiftKey's symbols on its English QWERTY letters, as its
+        // settings draw them (anomalyco/hex#2748): every letter row's, the top row's only beside a number row.
+        private val swiftKeySymbols = mapOf('a' to '@', 's' to '#', 'd' to '&', 'f' to '*', 'g' to '-', 'h' to '+',
+            'j' to '=', 'k' to '(', 'l' to ')', 'z' to '_', 'x' to '$', 'c' to '"', 'v' to '\'', 'b' to ':', 'n' to ';',
+            'm' to '/')
+        private val swiftKeyTopRow = mapOf('q' to '%', 'w' to '^', 'e' to '~', 'r' to '|', 't' to '[', 'y' to ']',
+            'u' to '<', 'i' to '>', 'o' to '{', 'p' to '}')
+        fun letterSymbol(c: Char, topRow: Boolean = false, currency: Char? = null, swiftKey: Boolean = false): Char? {
             val lower = c.lowercaseChar()
+            if (swiftKey) {
+                // A local currency takes $'s place, on x in SwiftKey's.
+                if (lower == 'x' && currency != null) return currency
+                return swiftKeySymbols[lower] ?: (if (topRow) swiftKeyTopRow[lower] else null)
+            }
             // A local currency replaces Gboard's $ on d, as it does on the ?123 page's own key.
             if (lower == 'd' && currency != null) return currency
             return letterSymbols[lower] ?: (if (topRow) topRowSymbols[lower] else null)
@@ -196,5 +208,9 @@ internal class LetterFeedback(private val host: ViewGroup, private val paints: K
         val periodHolds = listOf(listOf("(", ")", "#", "!", ",", "?"), listOf("-", ":", "@", "'", "/", ";"),
             listOf("·", "_", "&", "%", "\"", "+"))
         const val PERIOD_DEFAULT = 4
+        /** Labs › Keyboard › SwiftKey layout: SwiftKey's held period, one row reading ! , . ? with the period under the
+         * finger. Nearest the key first, as [periodHolds], so the row runs right to left from the key. */
+        val swiftKeyPeriodHolds = listOf(listOf("?", ".", ",", "!"))
+        const val SWIFTKEY_PERIOD_DEFAULT = 1
     }
 }
