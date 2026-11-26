@@ -195,6 +195,8 @@
     <string name="labs_output">Output</string>
     <string name="labs_keyboard">Keyboard</string>
     <string name="emoji_suggestions">Emoji suggestions</string>
+    <string name="emoji_search">Emoji search</string>
+    <string name="emoji_search_detail">A search key in the emoji panel: type a word, such as “laugh”, to find its emoji</string>
     <string name="emoji_shortcodes">Emoji shortcodes</string>
     <string name="emoji_shortcodes_detail">Type a colon and a name, such as “:fire”, for its emoji. A closing colon puts it in</string>
     <string name="emoji_suggestions_detail">Show an emoji for the English word you type, such as 😊 for “smile”</string>

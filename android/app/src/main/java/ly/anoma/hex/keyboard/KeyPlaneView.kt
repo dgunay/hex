@@ -116,6 +116,9 @@ internal class KeyPlaneView(context: Context, private val ime: HexKeyboard, priv
     private var picker: EmojiPickerView? = null
     private val emojiBottom = KeyRowLayout(context, 10f, side, gap, insetTop, insetBottom + bottomExtra)
     var emojiOpen = false
+    // The emoji panel's bottom row's keys (ABC, Labs › Keyboard › Emoji search's 🔍, space, delete), laid out as last shown.
+    private lateinit var emojiKeys: List<KeyCap>
+    private var emojiSearchShown: Boolean? = null
         private set
     private val roll = Rollover()
     // A slide from ?123 or shift types the key it lifts on: the keys it can type, and the one under it.
@@ -277,9 +280,12 @@ internal class KeyPlaneView(context: Context, private val ime: HexKeyboard, priv
         val emojiSpace = caps.cap("", context.getString(R.string.keyboard_space), caps.key, 14f) { ime.engine.space() }
         emojiSpace.sound = AudioManager.FX_KEYPRESS_SPACEBAR
         typesOnLift(emojiSpace, preview = { null }, holds = { emptyList() }, type = { emojiSpace.performClick() })
-        emojiBottom.add(letters, 0f, KeyboardMetrics.MODE)
-        emojiBottom.add(emojiSpace, KeyboardMetrics.MODE, 10f - 2 * KeyboardMetrics.MODE)
-        emojiBottom.add(newDeleteKey(), 10f - KeyboardMetrics.MODE, KeyboardMetrics.MODE)
+        // Labs › Keyboard › Emoji search: 🔍 between ABC and the space bar while it is on.
+        val search = caps.icon(R.drawable.ic_action_search, context.getString(R.string.keyboard_emoji_search), modifier, { host.searchEmoji() }, size = 22)
+        search.textEntry = false
+        typesOnLift(search, preview = { null }, holds = { emptyList() }, type = { search.performClick() })
+        emojiKeys = listOf(letters, search, emojiSpace, newDeleteKey())
+        layEmojiBottom(false)
         emojiBottom.visibility = GONE
         addView(emojiBottom, LayoutParams(LayoutParams.MATCH_PARENT, rowHeight + bottomExtra))
     }
@@ -621,6 +627,7 @@ internal class KeyPlaneView(context: Context, private val ime: HexKeyboard, priv
      * again, which redraws its Recently used row, and starts it at the top, as a new picker did. */
     fun openEmoji(extra: Int) {
         cancelGestures()
+        layEmojiBottom(ime.feedback.emojiSearch)
         val keyboard = height + extra // the keys' and the strip's height as they are
         // Turned, the screen is short: the panel may take up to two thirds of it, with smaller cells.
         val share = if (landscape) 0.67f else 0.6f
@@ -658,6 +665,21 @@ internal class KeyPlaneView(context: Context, private val ime: HexKeyboard, priv
         emojiOpen = false
     }
     private val recents by lazy { RecentEmoji(context) { ime.engine.learnsTyping } }
+    /** An emoji Labs › Keyboard › Emoji search put in: Recently used learns it, as a pick in the panel. */
+    fun recordEmoji(emoji: String) = recents.recordSelection(emoji)
+    /** The panel's bottom row: ABC, 🔍 with [search], the space bar and delete. */
+    private fun layEmojiBottom(search: Boolean) {
+        if (emojiSearchShown == search) return
+        emojiSearchShown = search
+        val (letters, searchKey, space, delete) = emojiKeys
+        val mode = KeyboardMetrics.MODE
+        emojiBottom.removeAllViews()
+        emojiBottom.add(letters, 0f, mode)
+        if (search) emojiBottom.add(searchKey, mode, mode)
+        val start = if (search) 2 * mode else mode
+        emojiBottom.add(space, start, 10f - mode - start)
+        emojiBottom.add(delete, 10f - mode, mode)
+    }
     private var pickerSized = 0
     /** The picker back at Recently used: its tab for them (the icon's clickable item), tapped. */
     private fun EmojiPickerView.toTop() {
