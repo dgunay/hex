@@ -239,6 +239,7 @@ internal fun HexSettings(setup: Setup, speech: SpeechPreferences, typing: Typing
     val strongAutocorrect = remember(revision) { typing.strongAutocorrect }
     val letterSymbols = remember(revision) { typing.letterSymbols }
     val swiftKeyLayout = remember(revision) { typing.swiftKeyLayout }
+    val holdDelay = remember(revision) { typing.holdDelay }
     val numberRow = remember(revision) { typing.numberRow }
     val snugBottom = remember(revision) { typing.snugBottom }
     val holdDeleteWords = remember(revision) { typing.holdDeleteWords }
@@ -646,6 +647,9 @@ internal fun HexSettings(setup: Setup, speech: SpeechPreferences, typing: Typing
                             Label(stringResource(R.string.labs_keyboard), muted = true, size = 14,
                                 mod = Modifier.padding(start = 16.dp))
                             Card {
+                                SettingSlider(stringResource(R.string.hold_delay), holdDelay, TypingPreferences.HOLD_DELAY_RANGE, step = 25,
+                                    label = { context.getString(R.string.delete_word_first_ms, it) }, change = { typing.holdDelay = it })
+                                Rule()
                                 Toggle(stringResource(R.string.letter_symbols), stringResource(R.string.letter_symbols_detail),
                                     letterSymbols) { typing.letterSymbols = it }
                                 Rule()

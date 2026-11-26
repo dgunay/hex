@@ -73,6 +73,13 @@ internal class TypingPreferences(context: Context) {
     var deleteWordFirst: Int
         get() = prefs.getInt(DELETE_WORD_FIRST, DELETE_WORD_FIRST_DEFAULT).coerceIn(DELETE_WORD_FIRST_RANGE)
         set(value) { prefs.edit().putInt(DELETE_WORD_FIRST, value.coerceIn(DELETE_WORD_FIRST_RANGE)).apply() }
+    /** Labs › Keyboard › Hold delay: how long a key is held, in ms, before its symbols and accents show. The Hex key
+     * (and SwiftKey layout's comma) start a dictation 50 ms later, never sooner than [TALK_HOLD_FLOOR]. */
+    var holdDelay: Int
+        get() = prefs.getInt(HOLD_DELAY, HOLD_DELAY_DEFAULT).coerceIn(HOLD_DELAY_RANGE)
+        set(value) { prefs.edit().putInt(HOLD_DELAY, value.coerceIn(HOLD_DELAY_RANGE)).apply() }
+    /** The hold that starts a dictation, from [holdDelay]: 350 ms at the default 300. */
+    val talkHold: Long get() = maxOf(TALK_HOLD_FLOOR, holdDelay + 50).toLong()
     /** Keyboard › Delete words when held: how much sooner each word goes than the one before, in percent. */
     var deleteWordSpeedup: Int
         get() = prefs.getInt(DELETE_WORD_SPEEDUP, DELETE_WORD_SPEEDUP_DEFAULT).coerceIn(DELETE_WORD_SPEEDUP_RANGE)
@@ -216,6 +223,11 @@ internal class TypingPreferences(context: Context) {
     companion object {
         const val SUGGEST_SWEAR_WORDS = "suggestSwearWords"
         const val NUMBER_ROW = "numberRow"
+        const val HOLD_DELAY = "holdDelay"
+        const val HOLD_DELAY_DEFAULT = 300
+        val HOLD_DELAY_RANGE = 100..600
+        /** A dictation's hold never starts sooner: a slow tap on the Hex key or the comma stays a tap. */
+        const val TALK_HOLD_FLOOR = 250
         const val DELETE_WORD_FIRST = "deleteWordFirst"
         const val DELETE_WORD_FIRST_DEFAULT = 500
         val DELETE_WORD_FIRST_RANGE = 200..1000

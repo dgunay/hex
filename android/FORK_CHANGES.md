@@ -54,6 +54,18 @@ Each setting's commits still use the names it had when it was added. Commit hash
   word scrolls back to the start.
 - **Commit:** Android Keyboard: Steadier suggestion strip, and More suggestions (Labs).
 
+### Hold delay (Labs)
+
+- **Setting:** Labs › Keyboard › Hold delay, 100–600 ms in steps of 25 (300, upstream's fixed value).
+- **What:** how long a key is held before its symbols and accents show (letters, period, comma on =<, the symbol
+  pages and the number row). Holding the Hex key, or SwiftKey layout's comma, starts a dictation 50 ms after it,
+  never sooner than 250 ms so a slow tap stays a tap: 350 ms at the default, as before.
+- **Why:** upstream's 300 ms (Gboard's) is fixed; asked for to make held symbols quicker.
+- **How:** `TypingPreferences.holdDelay`/`talkHold`, read at each press, in place of `KeyboardMetrics.HOLD_MS` and
+  `TALK_HOLD_MS`.
+- **Limits:** the space bar's long press (the language menu) keeps Android's own delay (Accessibility › Touch & hold
+  delay).
+
 ### SwiftKey layout (Labs)
 
 - **Switch:** Labs › Keyboard › SwiftKey layout (off).

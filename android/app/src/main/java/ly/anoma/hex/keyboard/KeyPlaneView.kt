@@ -215,7 +215,7 @@ internal class KeyPlaneView(context: Context, private val ime: HexKeyboard, priv
         // Labs › Keyboard › SwiftKey layout: held on the letters, comma dictates as the Hex key held does, until it lifts.
         typesOnLift(comma, preview = { null },
             holds = { if (current?.more == true) listOf(LetterFeedback.symbolHolds('<')) else emptyList() },
-            down = { if (swiftKeyDrawn && current?.symbols == false) postDelayed(commaTalk, KeyboardMetrics.TALK_HOLD_MS) },
+            down = { if (swiftKeyDrawn && current?.symbols == false) postDelayed(commaTalk, ime.feedback.talkHold) },
             type = { option -> if (option != null) ime.engine.type(option) else comma.performClick() },
             done = { removeCallbacks(commaTalk); if (commaTalking) { commaTalking = false; ime.finishSpeech() } },
             cancelled = {
@@ -752,7 +752,7 @@ internal class KeyPlaneView(context: Context, private val ime: HexKeyboard, priv
         item?.performClick()
     }
 
-    /** Touches for a key that types as it lifts: pressed, its pop-up, after [KeyboardMetrics.HOLD_MS] its held
+    /** Touches for a key that types as it lifts: pressed, its pop-up, after Labs › Keyboard › Hold delay its held
      * options to slide over, and on lifting (or when another key goes down first) [type] with the option
      * chosen, or null for the key's own. */
     private fun typesOnLift(k: KeyCap, preview: () -> String?, holds: () -> List<List<String>>, default: () -> Int = { 0 },
@@ -785,7 +785,7 @@ internal class KeyPlaneView(context: Context, private val ime: HexKeyboard, priv
                     val options = holds()
                     if (options.firstOrNull().isNullOrEmpty().not()) {
                         pendingAccents = Runnable { if (v.isPressed) feedback.hold(k.face, options, default()) }
-                        postDelayed(pendingAccents!!, KeyboardMetrics.HOLD_MS)
+                        postDelayed(pendingAccents!!, ime.feedback.holdDelay.toLong())
                     }
                 }
                 MotionEvent.ACTION_MOVE -> {

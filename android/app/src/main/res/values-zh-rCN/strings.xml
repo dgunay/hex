@@ -182,6 +182,7 @@
     <string name="signature_one_line">请使用一行</string>
     <string name="signature_too_long">请使用不超过 200 个字符</string>
     <string name="keyboard_tab">制表符</string>
+    <string name="hold_delay">长按延迟</string>
     <string name="swiftkey_layout">SwiftKey 布局</string>
     <string name="swiftkey_layout_detail">长按字母输入 Microsoft SwiftKey 的符号，底行表情符号键在逗号之前，以及它的句号弹出</string>
     <string name="letter_symbols">字母键上的符号</string>

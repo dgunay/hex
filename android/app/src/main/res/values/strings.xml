@@ -208,6 +208,7 @@
     <string name="signature_one_line">Use one line</string>
     <string name="signature_too_long">Use 200 characters or fewer</string>
     <string name="keyboard_tab">Tab</string>
+    <string name="hold_delay">Hold delay</string>
     <string name="swiftkey_layout">SwiftKey layout</string>
     <string name="swiftkey_layout_detail">Microsoft SwiftKey’s symbols when you hold a letter, its bottom row with emoji before the comma, and its period popup</string>
     <string name="letter_symbols">Symbols on letter keys</string>
