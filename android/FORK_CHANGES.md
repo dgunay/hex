@@ -263,6 +263,49 @@ Each setting's commits still use the names it had when it was added. Commit hash
   - Built for ARMv8.2 with dot product (every recent phone). Emulators that translate ARM can't run it.
 - **Commit:** Android Keyboard: Neural autocorrect, a small language model reading the sentence (Labs).
 
+## Emoji
+
+### Emoji shortcodes (Labs)
+
+- **Switch:** Labs › Keyboard › Emoji shortcodes (off).
+- **What:** type a colon and a name, such as `:fire`, and the strip offers its emoji (🔥, then others the name
+  starts or describes: `:piz` offers 🍕). Tap one to put it in place of the `:name`, or type the closing colon
+  (`:fire:`) for the emoji the name names exactly.
+- **Why:** finding an emoji meant scrolling the AndroidX picker's categories by eye. iPhone Hex has the same lab.
+- **How:**
+  - `typing/EmojiIndex.kt` reads iPhone Hex's emoji index (`assets/emoji/index-en.txt`, copied from
+    `ios/HEXShared/FullKeyboard/Emoji/emoji-index-en.txt`: Unicode's names and CLDR keywords, Unicode License v3,
+    plus Hex's chat words), loaded the first time a shortcode is typed. Emoji newer than Android 12's Emoji 13.1
+    are kept only where the phone's font draws them.
+  - `EmojiShortcode` ports iPhone Hex's rules: a token is a colon after whitespace or the field's start, then a
+    name of two or more letters or digits, so `abc:pizza`, `:p`, `:-D` and `10:30` stay text. Exact names and
+    aliases come first, then the names and keywords the token starts, one emoji per family.
+  - `KeyboardEngine` shows them in the strip after each key, takes a pick over the token, and puts in the exact
+    match on a closing colon.
+- **Limits:** English names only. Your use doesn't rank them yet.
+- **Commit:** Android Keyboard: Emoji shortcodes (Labs).
+
+## Dictation
+
+### Dictation sounds (Labs)
+
+- **Switch:** Labs › Dictation › Dictation sounds (off). On, a Sound row picks the set: desktop Hex's seven, in its
+  order and with its names (Classic keys first and chosen, as on desktop, then Kalimba, Click, Soft tone, Wood,
+  Warm synth, Thock). Picking one plays its start and stop.
+- **What:** a sound as the microphone opens, as you finish (✓, letting go of the Hex key, or the 1-minute stop),
+  when ✕ cancels, and when a dictation fails (no microphone, no model, couldn't transcribe). A text that goes in
+  2 s or more after the stop sound plays done, in the sets that have one. Nothing said ends quietly, as on desktop.
+  It works wherever Hex dictates: the keyboard, Home, the Quick Settings sheet and apps' speech requests.
+- **Why:** desktop Hex confirms each step with a sound; Android Hex was silent.
+- **How:** `DictationSounds` plays the sets' WAVs, copied from `resources/audio/sounds/` (Classic mixed down to
+  mono; 770 KB in all), through a `SoundPool` as system sounds (`USAGE_ASSISTANCE_SONIFICATION`), so silent and
+  vibrate modes quiet them and the System volume sets their level; the Sound page's Volume slider (5–100%,
+  100% to start, as Key click volume's: every 10% is 3 dB less) sets theirs below it. `MicCapture` plays each cue. The start sound
+  plays as recording begins, and the samples recorded until it ends, plus 120 ms, are zeroed, so it is never taken
+  for speech or transcribed. Off, nothing is loaded.
+- **Limits:** the first start after the lab turns on can be silent while its set loads.
+- **Commit:** Android: Dictation sounds, desktop Hex's sound sets (Labs).
+
 ## Dictation from another keyboard
 
 ### Voice-only mode answers apps' speech requests
