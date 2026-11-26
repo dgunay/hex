@@ -22,6 +22,8 @@ internal class KeyboardView(context: Context, private val ime: HexKeyboard) : Li
     private val size = KeySize.of(resources, ime.feedback.height)
     private val strip = StripView(context, ime, this)
     private val keys = KeyPlaneView(context, ime, this, feedback, size)
+    // Labs › Keyboard › Emoji search: the emoji found, between the search line and the letter keys.
+    private val searchGrid = EmojiSearchGrid(context) { e -> tap(context, ime.feedback.haptics, Tap.Press); ime.engine.pickSearchedEmoji(e) }
     private val menu: SpeechMenu
     private var phase = SpeechPhase.Idle
     /** Where the key held for More characters was, so TalkBack's focus can go back to it. */
@@ -46,6 +48,8 @@ internal class KeyboardView(context: Context, private val ime: HexKeyboard) : Li
         }
         setBackgroundColor(context.getColor(R.color.keyboard))
         addView(strip, LayoutParams(LayoutParams.MATCH_PARENT, strip.stripHeight))
+        searchGrid.visibility = GONE
+        addView(searchGrid, LayoutParams(LayoutParams.MATCH_PARENT, searchGrid.gridHeight))
         addView(keys, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
         menu = SpeechMenu(context, ime, strip::title, ::closeMenu).apply { visibility = GONE }
         addView(menu, LayoutParams(-1, keys.menuHeight))
@@ -66,7 +70,11 @@ internal class KeyboardView(context: Context, private val ime: HexKeyboard) : Li
     override fun shown(slots: List<Suggestion?>, more: List<Suggestion>, keepScroll: Boolean) =
         strip.suggestions(slots, more, keepScroll)
     override fun undoDictation(shown: Boolean) = strip.undo(shown)
-    override fun emojiSearch(query: String?, results: List<String>) = strip.emojiSearch(query, results)
+    override fun emojiSearch(query: String?, results: List<String>) {
+        strip.emojiSearch(query)
+        searchGrid.visibility = if (query != null) VISIBLE else GONE
+        if (query != null) searchGrid.show(query, results)
+    }
     override fun toolsChanged() = strip.update()
     override fun keyGrid() = keys.letterGrid()
     fun notice(notice: StripNotice?) = strip.notice(notice)
@@ -92,6 +100,7 @@ internal class KeyboardView(context: Context, private val ime: HexKeyboard) : Li
     fun searchEmoji() {
         closeEmoji(); ime.engine.letters()
         ime.engine.onEmojiPicked = keys::recordEmoji
+        ime.engine.recentEmoji = keys::recentEmoji
         ime.engine.startEmojiSearch()
     }
     /** The menu takes the keys' height for the page, the number row included: opening it never resizes. */
