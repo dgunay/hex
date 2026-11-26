@@ -5,6 +5,9 @@
 Hex is local voice dictation for Mac, Windows and Linux. Hold a key, speak, and
 it pastes.
 
+This is a fork that changes the Android app in a number of ways. Here is an
+overview of [what this fork changes](android/FORK_CHANGES.md).
+
 ## How it works
 
 - hold the shortcut, speak, then let go
