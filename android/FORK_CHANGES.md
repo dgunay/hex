@@ -463,6 +463,9 @@ Each setting's commits still use the names it had when it was added. Commit hash
 - **Privacy:** password fields and fields that ask keyboards not to learn (incognito) are never logged, not even
   their keys. Files are in the app's private storage (`files/typing-log/`), read with
   `adb shell run-as ly.anoma.hex cat files/typing-log/*` on this debug build. Up to 200 MB, oldest files dropped.
+- **Model timings:** with Neural autocorrect on, it also logs how long space waited for the model (how long its word
+  queued and what it queued behind, how long it ran, for how many words) and each strip batch's and context read's
+  time, so the delay felt while typing can be taken apart. Timings only, no text.
 - **How:** `TypingLog` writes lines on its own thread. `KeyboardEngine` posts a snapshot after each entry point
   (`logAfter`), so it sees the text as the event left it; `StripView` logs each strip.
 - **Limits:** a line is two extra reads of the field's text per event, so typing is a little slower while it's on.

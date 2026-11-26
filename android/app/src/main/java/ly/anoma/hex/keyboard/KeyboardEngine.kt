@@ -1230,7 +1230,7 @@ internal class KeyboardEngine(
             rankingEarlier = shownFor
             val rest = after.drop(at.tail.length)
             val weight = w.decoder.neuralWeight
-            neural.costsLater(at.before, TypingWord.revisitWords(pool, rest)) { costs ->
+            neural.costsLater(at.before, TypingWord.revisitWords(pool, rest), "earlier") { costs ->
                 val order = TypingWord.revisitOrder(pool, costs, weight) ?: return@costsLater
                 main.post {
                     if (rankingEarlier !== shownFor || selStart != shownFor.cursor || selEnd != shownFor.cursor) return@post
