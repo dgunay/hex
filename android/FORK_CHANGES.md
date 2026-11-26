@@ -285,6 +285,21 @@ Each setting's commits still use the names it had when it was added. Commit hash
 - **Limits:** English names only. Your use doesn't rank them yet.
 - **Commit:** Android Keyboard: Emoji shortcodes (Labs).
 
+### Emoji search (Labs)
+
+- **Switch:** Labs › Keyboard › Emoji search (off).
+- **What:** a 🔍 key in the emoji panel's bottom row, between ABC and the space bar. Tapping it brings back the
+  letter keys, which type into a search line in the strip: a back button, what you've typed, and the emoji found,
+  scrolling. Tap one to put it in; the search stays for another. Back returns to the panel; Return or the emoji
+  key ends it.
+- **Why:** the AndroidX picker has no search, and can't be given one. Gboard and iPhone Hex search.
+- **How:** `KeyboardEngine` holds the search while it runs: letters, digits, space, delete (held: a word) and
+  Return edit it instead of the field, and a swipe does nothing. `EmojiIndex.search` (iPhone Hex's rules: each
+  word must start a word of the emoji's name or keywords; whole name words first) finds up to 60. `StripView`'s
+  search line shows them. A found emoji goes into the panel's Recently used.
+- **Limits:** English words only. Your use doesn't rank the results.
+- **Commit:** Android Keyboard: Emoji search (Labs).
+
 ## Dictation
 
 ### Dictation sounds (Labs)

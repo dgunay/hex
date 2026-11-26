@@ -167,6 +167,8 @@
     <string name="labs_output">输出</string>
     <string name="labs_keyboard">键盘</string>
     <string name="emoji_suggestions">表情符号建议</string>
+    <string name="emoji_search">表情符号搜索</string>
+    <string name="emoji_search_detail">表情符号面板中的搜索键：输入英文单词（如“laugh”）查找表情符号</string>
     <string name="emoji_shortcodes">表情符号短代码</string>
     <string name="emoji_shortcodes_detail">输入冒号加英文名称（如“:fire”）显示对应表情符号，再输入冒号即可插入</string>
     <string name="emoji_suggestions_detail">为输入的英文单词显示表情符号，例如输入“smile”显示 😊</string>

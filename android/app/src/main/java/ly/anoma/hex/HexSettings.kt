@@ -172,6 +172,7 @@ internal fun HexSettings(setup: Setup, speech: SpeechPreferences, typing: Typing
     var signatureDraft by remember { mutableStateOf(speech.signatureText) }
     val emojiSuggestions = remember(revision) { typing.emojiSuggestions }
     val emojiShortcodes = remember(revision) { typing.emojiShortcodes }
+    val emojiSearch = remember(revision) { typing.emojiSearch }
     val keyboardTools = remember(revision) { typing.keyboardTools }
     val clipboardHistory = remember(revision) { typing.clipboardHistory }
     val smartQuotes = remember(revision) { typing.smartQuotes }
@@ -616,6 +617,9 @@ internal fun HexSettings(setup: Setup, speech: SpeechPreferences, typing: Typing
                                 Rule()
                                 Toggle(stringResource(R.string.emoji_shortcodes), stringResource(R.string.emoji_shortcodes_detail),
                                     emojiShortcodes) { typing.emojiShortcodes = it }
+                                Rule()
+                                Toggle(stringResource(R.string.emoji_search), stringResource(R.string.emoji_search_detail),
+                                    emojiSearch) { typing.emojiSearch = it }
                                 Rule()
                                 Toggle(stringResource(R.string.keyboard_tools), stringResource(R.string.keyboard_tools_detail),
                                     keyboardTools) { typing.keyboardTools = it }

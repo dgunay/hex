@@ -66,6 +66,7 @@ internal class KeyboardView(context: Context, private val ime: HexKeyboard) : Li
     override fun shown(slots: List<Suggestion?>, more: List<Suggestion>, keepScroll: Boolean) =
         strip.suggestions(slots, more, keepScroll)
     override fun undoDictation(shown: Boolean) = strip.undo(shown)
+    override fun emojiSearch(query: String?, results: List<String>) = strip.emojiSearch(query, results)
     override fun toolsChanged() = strip.update()
     override fun keyGrid() = keys.letterGrid()
     fun notice(notice: StripNotice?) = strip.notice(notice)
@@ -79,12 +80,19 @@ internal class KeyboardView(context: Context, private val ime: HexKeyboard) : Li
      * replaces its toolbar too); ABC brings both back. */
     fun openEmoji() {
         if (strip.recording) return
+        ime.engine.endEmojiSearch()
         closeMenu(); ime.engine.clearForDictation()
         strip.visibility = GONE; keys.openEmoji(strip.stripHeight)
     }
     fun closeEmoji() {
         if (!keys.emojiOpen) return
         keys.closeEmoji(); strip.visibility = VISIBLE; strip.update()
+    }
+    /** Labs › Keyboard › Emoji search: the panel's 🔍. The letter keys come back and type into the search line. */
+    fun searchEmoji() {
+        closeEmoji(); ime.engine.letters()
+        ime.engine.onEmojiPicked = keys::recordEmoji
+        ime.engine.startEmojiSearch()
     }
     /** The menu takes the keys' height for the page, the number row included: opening it never resizes. */
     private fun resizeMenu() {

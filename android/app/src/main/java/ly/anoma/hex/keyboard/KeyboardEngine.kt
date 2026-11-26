@@ -34,10 +34,13 @@ internal interface KeyboardSurface {
     /** The strip, in the typing model's order: what was typed first when it shows, then the fix or the
      * likeliest word, then the rest. Next words after a space are [Suggestion.Kind.Next]. */
     fun suggestions(slots: List<Suggestion>) = Suggestion.place(slots).let { shown(it, Suggestion.more(slots, it)) }
-    /** The strip's slots as shown, left to right ([Suggestion.SLOTS], null for an empty one). */
-    /** [more]: the words past the slots (Labs › Keyboard › More suggestions), a scroll away; [keepScroll] leaves the
-     * strip scrolled where it was, the same word's next strip. */
+    /** The strip's slots as shown, left to right ([Suggestion.SLOTS], null for an empty one). [more]: the words past
+     * them (Labs › Keyboard › More suggestions), a scroll away; [keepScroll] leaves the strip scrolled where it was,
+     * the same word's next strip. */
     fun shown(slots: List<Suggestion?>, more: List<Suggestion> = emptyList(), keepScroll: Boolean = false)
+    /** Labs › Keyboard › Emoji search: the search line in the strip's place, with what was typed and the emoji it finds;
+     * a null [query] takes it away. */
+    fun emojiSearch(query: String?, results: List<String>) {}
     /** Offer Undo dictation, or stop offering it. */
     fun undoDictation(shown: Boolean)
     /** The strip's tools changed (Labs › Keyboard › Keyboard tools): Undo follows the last autocorrection. */
@@ -107,6 +110,9 @@ internal class KeyboardEngine(
         const val CHIP_PAUSE_MS = 100L
         /** Words past the strip's three slots, which it scrolls to. */
         const val MORE_WORDS = 8
+        /** Labs › Keyboard › Emoji search: the most found emoji the strip scrolls through, and the longest search. */
+        const val SEARCH_RESULTS = 60
+        const val SEARCH_LENGTH = 40
         /** Undo dictation stays this long unless something else happens first (iPhone Hex: 12 s). */
         const val UNDO_MS = 12_000L
         /** Autocorrections a field remembers for Keyboard › Fix earlier words. */
@@ -211,6 +217,7 @@ internal class KeyboardEngine(
         keyEventEditor = field.keyEvents
         learnsTyping = field.learns
         resetTyping(); word = null; clearSpaces(); forgetSwipe(); toldSwipe = false; fixes.clear(); earlier = null
+        if (searching != null) { searching = null; surface?.emojiSearch(null, emptyList()) }
         adaptive = adaptiveTouch(); adaptive?.beginSession()
         pad = Pad.of(attribute.inputType)
         symbols = pad != null
@@ -530,6 +537,7 @@ internal class KeyboardEngine(
      * touch slid onto the key, so where it went down says nothing of where you aim. */
     fun letter(text: String, x: Double, y: Double, grid: KeyGrid, explicit: Boolean = false, aimed: Boolean = true) {
         if (!target.connected) return
+        searching?.let { if (it.length < SEARCH_LENGTH) it.append(text.lowercase()); showSearch(); return }
         edited(); kept.drop()
         val w = word
         if (w == null || symbols || !text.single().isLetter()) { type(text); return }
@@ -664,6 +672,7 @@ internal class KeyboardEngine(
     /** The space bar, tapped at [point] in [grid]'s coordinates (null off the letters page). */
     fun space(point: KeyPoint? = null, grid: KeyGrid? = null) {
         if (!target.connected) return
+        searching?.let { if (it.isNotEmpty() && it.last() != ' ') it.append(' '); showSearch(); return }
         edited()
         val now = clock()
         val b = before()
@@ -727,6 +736,11 @@ internal class KeyboardEngine(
 
     fun type(value: String) {
         if (!target.connected) return
+        searching?.let { q ->
+            if (value == " ") space() else if (value == "\n") endEmojiSearch()
+            else if (value.length == 1 && value[0].isLetterOrDigit() && q.length < SEARCH_LENGTH) { q.append(value.lowercase()); showSearch() }
+            return
+        }
         edited()
         if (value == " ") { space(); return }
         if (value == SmartQuotes.CLOSING_DOUBLE.toString() && closeQuote(SmartQuotes.CLOSING_DOUBLE)) return
@@ -778,6 +792,40 @@ internal class KeyboardEngine(
         if (!showShortcode()) showPredictions(if (w != null) before() else null)
         inputDone()
     }
+    /** Labs › Keyboard › Emoji search: what has been searched while the letter keys type into it, else null. */
+    private var searching: StringBuilder? = null
+    val emojiSearching get() = searching != null
+    /** The emoji panel's 🔍: the letter keys type a search instead of text, and the strip shows what it finds. */
+    fun startEmojiSearch() {
+        if (!feedback.emojiSearch || emoji == null || !target.connected) return
+        edited(); resetTyping(); clearSpaces(); undo = null
+        searching = StringBuilder(); showSearch()
+    }
+    /** The search line's back, Return, or the emoji key: the keys type text again. */
+    fun endEmojiSearch() {
+        if (searching == null) return
+        searching = null; surface?.emojiSearch(null, emptyList())
+        val b = before()
+        showPredictions(if (word != null && TypingWord.boundary(b.lastOrNull())) b else null)
+    }
+    private fun showSearch() {
+        val q = searching ?: return
+        val index = emoji?.index
+        if (index == null) {
+            emoji?.loadIndex { main.post { if (searching === q) showSearch() } }
+            surface?.emojiSearch(q.toString(), emptyList()); return
+        }
+        surface?.emojiSearch(q.toString(), if (q.isBlank()) emptyList() else index.search(q.toString(), SEARCH_RESULTS).map(index::emoji))
+    }
+    /** A found emoji tapped: it goes in, and the search stays for another. */
+    fun pickSearchedEmoji(text: String) {
+        if (searching == null || !target.connected) return
+        takeHeldSpace(before()); target.commit(text)
+        onEmojiPicked(text)
+    }
+    /** An emoji went in from a search: the panel's Recently used learns it. */
+    var onEmojiPicked: (String) -> Unit = {}
+
     /** Labs › Keyboard › Emoji shortcodes, where the field is one to suggest in. */
     private fun shortcodes() = feedback.emojiShortcodes && !secure && !keyEventEditor && emoji != null
     /** The emoji the strip offers for a ":name" before the cursor, while it shows them. */
@@ -809,6 +857,7 @@ internal class KeyboardEngine(
     }
     fun delete() {
         if (!target.connected) return
+        searching?.let { if (it.isNotEmpty()) it.setLength(it.length - 1); showSearch(); return }
         kept.drop()
         // Hex's own Delete is the person removing text, so a field that then empties was cleared by them.
         tracker.keyboardRemoved()
@@ -852,6 +901,7 @@ internal class KeyboardEngine(
     fun pasted() { edited(); adaptive?.forget(); resetTyping(); clearSpaces(); showStrip(emptyList()) }
 
     fun enter() {
+        if (searching != null) { endEmojiSearch(); return }
         edited(); adaptive?.forget()
         // A text replacement that ends the text goes in before the line break or the editor's action.
         word?.takeIf { canEndWord() }?.textReplacement(before())?.let { replace(it.original, smartWord(it.replacement)) }
@@ -889,9 +939,11 @@ internal class KeyboardEngine(
     /** Labs › Keyboard › Delete words when held: a held Delete takes the word before the cursor (what a delete slide
      * would select first). Returns the UTF-16 length removed, 0 with nothing before the cursor, or -1 where words
      * can't be read (the lab off, a password or TYPE_NULL field, a selection, no known cursor), so the held key
-     * repeats letters as before. */
+     * repeats letters as before. In Emoji search it takes the query's last word. */
     fun deleteWord(): Int {
-        if (!feedback.deleteWords || secure || keyEventEditor || selStart < 0 || selStart != selEnd || !target.connected) return -1
+        if (!feedback.deleteWords) return -1
+        searching?.let { q -> val had = q.length; q.setLength(q.trimEnd().lastIndexOf(' ').coerceAtLeast(0)); showSearch(); return had - q.length }
+        if (secure || keyEventEditor || selStart < 0 || selStart != selEnd || !target.connected) return -1
         val before = target.before(2000) ?: return -1
         val length = DeleteSlide.wordLengths(before).firstOrNull() ?: return 0
         tracker.keyboardRemoved()
@@ -1045,6 +1097,7 @@ internal class KeyboardEngine(
 
     /** A letter touch became a swipe: its key no longer types. Null when it can't be one here. */
     fun beginSwipe(): SwipeContext? {
+        if (searching != null) return null
         if (!swipes) {
             if (swipeUnreadable && !toldSwipe) { toldSwipe = true; swipeUnavailable() }
             return null

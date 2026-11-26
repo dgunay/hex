@@ -87,6 +87,12 @@ internal class StripView(context: Context, private val ime: HexKeyboard, private
     /** The hint line holds a dictation's note ("No speech heard", "Stopped at 1 minute"), not the idle hint. */
     private var noting = false
     // A dismissible line in the hint's place (Hex Preview's update): it goes for this field once typing starts.
+    // Labs › Keyboard › Emoji search: back to the panel, what was typed, and the emoji found, scrolling, in the slots' place.
+    private val searchRow = LinearLayout(context)
+    private val searchQuery = TextView(context)
+    private val searchScroll = HorizontalScrollView(context)
+    private val searchResults = LinearLayout(context)
+    private var searchShown: String? = null
     private val noticeRow = LinearLayout(context)
     private val noticeText = TextView(context)
     private val noticeClose = FrameLayout(context)
@@ -152,6 +158,21 @@ internal class StripView(context: Context, private val ime: HexKeyboard, private
         noticeRow.addView(noticeClose, LinearLayout.LayoutParams(dp(40), -1))
         noticeRow.visibility = GONE
         idleRow.addView(noticeRow, LinearLayout.LayoutParams(0, -1, 1f))
+        searchRow.orientation = LinearLayout.HORIZONTAL; searchRow.gravity = Gravity.CENTER_VERTICAL
+        searchRow.addView(toolButton(R.drawable.ic_back, R.string.keyboard_emoji_search_back) { ime.engine.endEmojiSearch(); host.openEmoji() },
+            LinearLayout.LayoutParams(dp(40), -1))
+        searchQuery.apply {
+            useInter(500); setTextSize(TypedValue.COMPLEX_UNIT_DIP, 15f); maxLines = 1; ellipsize = TextUtils.TruncateAt.START
+            gravity = Gravity.CENTER_VERTICAL; setPadding(dp(4), 0, dp(10), 0); maxWidth = dp(150)
+            accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
+        }
+        searchRow.addView(searchQuery, LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, -1))
+        searchScroll.isHorizontalScrollBarEnabled = false; searchScroll.overScrollMode = OVER_SCROLL_NEVER
+        searchResults.orientation = LinearLayout.HORIZONTAL; searchResults.gravity = Gravity.CENTER_VERTICAL
+        searchScroll.addView(searchResults, FrameLayout.LayoutParams(LayoutParams.WRAP_CONTENT, -1))
+        searchRow.addView(searchScroll, LinearLayout.LayoutParams(0, -1, 1f))
+        searchRow.visibility = GONE
+        idleRow.addView(searchRow, LinearLayout.LayoutParams(0, -1, 1f))
         for (i in 0..2) {
             if (i > 0) slotRow.addView(dividers[i - 1].apply { setBackgroundColor(color(R.color.rule)) },
                 LinearLayout.LayoutParams(maxOf(1, dp(1) / 2 + 1), dp(20)).apply { gravity = Gravity.CENTER_VERTICAL })
@@ -377,6 +398,28 @@ internal class StripView(context: Context, private val ime: HexKeyboard, private
         measurePaint.textSize = dpToPx(StripText.SIZE, resources.displayMetrics)
         return measurePaint.measureText(word.text, 0, word.text.length)
     }
+    /** Labs › Keyboard › Emoji search: the search line with [query] and the emoji it found, or none for a null [query]. */
+    fun emojiSearch(query: String?, results: List<String>) {
+        val was = searchShown
+        searchShown = query
+        if (query != null) {
+            searchQuery.text = query.ifEmpty { context.getString(R.string.keyboard_emoji_search) }
+            searchQuery.setTextColor(if (query.isEmpty()) quiet else ink)
+            searchResults.removeAllViews()
+            if (query.isNotBlank() && results.isEmpty()) searchResults.addView(TextView(context).apply {
+                text = context.getString(R.string.keyboard_emoji_search_none); useInter(450); setTextColor(quiet)
+                setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14f); gravity = Gravity.CENTER_VERTICAL; setPadding(dp(6), 0, dp(6), 0)
+            }, LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, -1))
+            for (e in results) searchResults.addView(TextView(context).apply {
+                text = e; setTextSize(TypedValue.COMPLEX_UNIT_DIP, 24f); gravity = Gravity.CENTER; includeFontPadding = false
+                minWidth = dp(44); isFocusable = true; contentDescription = e
+                background = pressable(android.graphics.Color.TRANSPARENT)
+                setOnClickListener { ime.engine.pickSearchedEmoji(e) }
+            }, LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, -1))
+            if (was != query) searchScroll.scrollTo(0, 0)
+        }
+        update()
+    }
     /** Undo dictation shows in the slots' place, or goes. */
     fun undo(shown: Boolean) { undoing = shown; update() }
     /** The notice showing now, if any. */
@@ -459,6 +502,10 @@ internal class StripView(context: Context, private val ime: HexKeyboard, private
         toolClipboard.visibility = if (StripTool.Clipboard in tools) VISIBLE else GONE
         toolUndo.visibility = if (StripTool.Undo in tools) VISIBLE else GONE
         statusText.visibility = if (idle && !show && !chips && (!undo || spoken) && !noted && tools.isEmpty()) VISIBLE else GONE
+        // Labs › Keyboard › Emoji search has the line to itself while it runs.
+        val searching = idle && !choosing && searchShown != null
+        searchRow.visibility = if (searching) VISIBLE else GONE
+        if (searching) for (v in listOf(noticeRow, undoBox, inlineArea, slotScroll, toolsRow, statusText)) v.visibility = GONE
         menuKey.text = context.getString(when {
             choosing -> R.string.keyboard_menu_done
             show || shared || chips -> R.string.keyboard_menu_more
