@@ -151,6 +151,8 @@ internal class KeyboardEngine(
     private val fixes = ArrayDeque<Undo>()
     private class Earlier(val cursor: Int, val word: EarlierWord, val typed: String?, val language: String)
     private var earlier: Earlier? = null
+    /** The revisited word Neural autocorrect is ranking, until it answers or the cursor moves. */
+    private var rankingEarlier: Earlier? = null
     private var scratch: TypingWord? = null
     private val shift = ShiftState()
     private var symbols = false
@@ -1282,26 +1284,48 @@ internal class KeyboardEngine(
      * read with the words on both sides. Returns whether the strip shows them.
      */
     private fun showEarlier(): Boolean {
-        earlier = null
+        earlier = null; rankingEarlier = null
         if (!feedback.fixEarlierWords || secure || keyEventEditor || !correctingField || symbols || pad != null) return false
         val w = word ?: return false
         if (w.token.isNotEmpty() || w.standIn || selStart < 0 || selStart != selEnd || swiped != null || takenBack != null) return false
         val b = before()
         // A pick that held its space for the text after: the strip has that word's next words.
         if ((heldAnchor != null && heldAnchor == b) || (swipeAnchor != null && swipeAnchor == b)) return false
-        val at = EarlierWord.at(b, target.after(40).orEmpty()) ?: return false
+        val after = target.after(EarlierWord.AFTER_CHARS).orEmpty()
+        val at = EarlierWord.at(b, after) ?: return false
         val grid = surface?.keyGrid() ?: return false
         val reader = scratch?.takeIf { it.decoder === w.decoder } ?: TypingWord(w.decoder, w.spatial).also { scratch = it }
         reader.suggestSwearWords = w.suggestSwearWords; reader.addsCapitals = w.addsCapitals
         val language = w.decoder.model.language
         val typed = fixes.lastOrNull { it.language == language && it.replacement == at.text }?.original
-        val others = reader.revisit(at.text, at.before, at.next, grid).filterNot { it.equals(typed, ignoreCase = true) }
-        val slots = listOfNotNull(typed?.let { Suggestion(it, Suggestion.Kind.Typed) }) +
-            others.map { Suggestion(it, Suggestion.Kind.Word) }
-        if (slots.isEmpty()) return false
+        val pool = reader.revisitPool(at.text, at.before, at.next, grid).filterNot { !it.stands && it.text.equals(typed, ignoreCase = true) }
+        fun slots(words: List<String>) = (listOfNotNull(typed?.let { Suggestion(it, Suggestion.Kind.Typed) }) +
+            words.take(TypingWord.REVISIT_WORDS).map { Suggestion(it, Suggestion.Kind.Word) }).take(Suggestion.SLOTS)
+        val first = slots(pool.filter { it.offered && !it.stands }.map { it.text })
+        // Labs › Keyboard › Neural autocorrect: the model reads each word in its sentence, the words after it as well as
+        // before, and its order replaces the word pairs' once it answers. Its likeliest may be one the pairs left out.
+        val neural = w.decoder.neural?.takeIf { it.active && language == "en" && pool.any { !it.stands } }
+        if (first.isEmpty() && neural == null) return false
         cancelChip()
-        earlier = Earlier(selStart, at, typed, language)
-        surface?.suggestions(slots.take(Suggestion.SLOTS).map(::shown))
+        val shownFor = Earlier(selStart, at, typed, language)
+        // With nothing the pairs would offer, the strip stays as it is until the model answers.
+        if (first.isNotEmpty()) { earlier = shownFor; surface?.suggestions(first.map(::shown)) }
+        if (neural != null) {
+            rankingEarlier = shownFor
+            val rest = after.drop(at.tail.length)
+            val weight = w.decoder.neuralWeight
+            neural.costsLater(at.before, TypingWord.revisitWords(pool, rest)) { costs ->
+                val order = TypingWord.revisitOrder(pool, costs, weight) ?: return@costsLater
+                main.post {
+                    if (rankingEarlier !== shownFor || selStart != shownFor.cursor || selEnd != shownFor.cursor) return@post
+                    rankingEarlier = null
+                    if (earlier == null && slots(order).isEmpty()) return@post
+                    earlier = shownFor
+                    TypingLog.event { "earlier ranked ${TypingLog.q(at.text)}: " + order.joinToString(",") }
+                    surface?.suggestions(slots(order).map(::shown))
+                }
+            }
+        }
         return true
     }
 

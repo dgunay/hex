@@ -61,6 +61,9 @@ internal class SpatialDecoder(val model: TypingModel) {
     @Volatile var strayLetterCost = STRAY_LETTER_COST
     /** Whether Neural autocorrect reads run-together words with a stray letter for the space, or a contraction inside. */
     @Volatile var neuralSplits = true
+    /** The search's breadth for Keyboard › Fix earlier words, wider than typing's [BEAM]: a word gone back to is read
+     * once, off the typing path, and a long word's one wrong letter shouldn't lose it to cheaper dead ends. */
+    @Volatile var revisitBeam = REVISIT_BEAM
     data class Decision(val replace: String?, val readings: List<Reading>)
     // Google Books English has richer word pairs; these are the shared iOS R1 weights.
     private val lmWeight = if (model.language == "en") 1.5 else 1.25
@@ -157,7 +160,7 @@ internal class SpatialDecoder(val model: TypingModel) {
     // The words of [lexicon] (the model unless given) the taps from..end read as. Only the model's
     // words are checked against the never-suggest list: your own words are yours to offer.
     private fun search(taps: List<Tap>, from: Int, end: Int, edits: Int, swears: Boolean, previous: Int,
-                       lexicon: Lexicon = model): List<Found> {
+                       lexicon: Lexicon = model, beam: Int = BEAM): List<Found> {
         val depthLimit = end - from + edits + 2
         val context = model.neverSuggest.restrictedContext(previous)
         val own = lexicon === model
@@ -177,7 +180,7 @@ internal class SpatialDecoder(val model: TypingModel) {
         }
         for (d in 0..depthLimit) {
             val layer = layers[d]
-            if (layer.size > 48) { layer.sortBy { it.cost }; layer.subList(48, layer.size).clear() }
+            if (layer.size > beam) { layer.sortBy { it.cost }; layer.subList(beam, layer.size).clear() }
             var i = 0
             while (i < layer.size) {
                 val s = layer[i++]
@@ -223,12 +226,12 @@ internal class SpatialDecoder(val model: TypingModel) {
     fun revisit(typed: String, taps: List<Tap>, previous: Int, next: Int, swears: Boolean): List<Reading> {
         if (typed.length !in 1..32 || taps.size != typed.length || typed.any { model.code(it) == 0 }) return emptyList()
         fun context(w: Int) = model.languageCost(previous, w) + if (next >= 0) model.languageCost(w, next) else 0.0
+        // Each word's cheapest taps; its [Reading.lm] is the word pairs' part, which Neural autocorrect replaces.
         val best = HashMap<Int, Double>()
-        for ((w, spatial) in search(taps, 0, taps.size, maxOf(1, edits(typed.length)), swears, previous)) {
-            val cost = spatial + lmWeight * context(w)
-            if (cost < (best[w] ?: Double.POSITIVE_INFINITY)) best[w] = cost
-        }
-        return best.entries.sortedBy { it.value }.map { Reading(model.text(it.key), it.value, model.frequencyCost(it.key)) }
+        for ((w, spatial) in search(taps, 0, taps.size, maxOf(1, edits(typed.length)), swears, previous, beam = revisitBeam))
+            if (spatial < (best[w] ?: Double.POSITIVE_INFINITY)) best[w] = spatial
+        return best.entries.map { (w, spatial) -> val lm = lmWeight * context(w); Reading(model.text(w), spatial + lm, model.frequencyCost(w), lm) }
+            .sortedBy { it.cost }
     }
 
     /** [context] is the text before the word, for Labs › Keyboard › Neural autocorrect: given while [neural] is set,
@@ -573,6 +576,9 @@ internal class SpatialDecoder(val model: TypingModel) {
     private companion object {
         val spatialOrder = compareBy<Found> { it.cost }.thenBy { it.word }
         const val EDIT_COST = 7.0
+        /** Partial words the search keeps at each letter while typing. */
+        const val BEAM = 48
+        const val REVISIT_BEAM = 256
         // Labs › Keyboard › Neural autocorrect: readings the model scores beside the spelling (libhextyping takes 12).
         // The English gate reads no better with 15, and a Flip6 scores 10 words in 46 ms against 16 in 57.
         const val NEURAL_READINGS = 9

@@ -127,7 +127,8 @@ Each setting's commits still use the names it had when it was added. Commit hash
     spelling.
   - The word's letters become taps on their keys' centres and are read by `SpatialDecoder.revisit` within the
     usual edit distance. Each candidate is scored with the language model against the previous word *and* the
-    next word.
+    next word. Its search keeps 256 partial words at each letter (`REVISIT_BEAM`; typing keeps 48): with 48, a long
+    word with one wrong first letter ("dandidate") lost "candidate" to cheaper dead ends and offered nothing.
   - Up to 3 candidates are shown (`REVISIT_WORDS`). Each must be within 10 nats of the word as it stands
     (`REVISIT_MARGIN`), so a word that fits ("the" in "on the table") offers nothing.
   - Replacing the word selects it with `setSelection` and commits the new one in a batch edit. A space follows it
@@ -138,6 +139,25 @@ Each setting's commits still use the names it had when it was added. Commit hash
   - Splits and joins ("deli ate" → "delicate") aren't remembered, since they change more than one word.
 - **Commit:** `9446017d` Android Keyboard: Fix earlier words offers other words for one you go back to.
   Its pick's space: Android Keyboard: Fix earlier words' pick takes its space as any pick does.
+  The wider search and the model's order: Android Keyboard: Fix earlier words reads the whole sentence with Neural
+  autocorrect.
+- **With Neural autocorrect:** the model ranks the words for one you went back to by the whole sentence, the words
+  after it as well as before. Each reading is scored with the rest of its sentence after it ("buy a new car this
+  weekend.", up to 80 characters), weighed against its taps as typing weighs it (1.5), and offered only within 10 of
+  the word as it stands, as the pairs' margin. The pairs' strip shows at once; the model's replaces it when it
+  answers, in the background. Its likeliest may be one the pairs left out (it reads 8 within 20).
+- **Benchmark:** `EarlierWordsBench` (run with `HEX_BENCH_EARLIER=1`): the gate's 2,000 held-out sentences, each
+  word the synthetic taps typed wrong (3,127), gone back to with the rest of the sentence right; and 1,074 words typed
+  right.
+
+  | | Meant word first | In the strip | Offers on a right word |
+  |---|---|---|---|
+  | Before (beam 48, pairs) | 81.8% | 84.9% | 31.0% |
+  | Beam 256, pairs | 88.4% | 92.5% | 32.8% |
+  | Beam 256, model | 92.6% | 93.3% | 11.8% |
+
+  Most of what's still missed has no reading within one edit (two typos, names). The taps are synthetic, not
+  recorded.
 
 ### Learn new words
 
@@ -254,7 +274,7 @@ Each setting's commits still use the names it had when it was added. Commit hash
   - English only. It needs the 145 MB download and keeps 224 MB in memory while loaded.
   - The weight isn't tuned yet, and the gate's short Tatoeba sentences can't show what longer context or
     unknown words gain. A messages-style test set with names and tech words is still to be made.
-  - Fix earlier words still uses the word pairs. Next-word predictions at a sentence's start or after a comma keep
+  - Next-word predictions at a sentence's start or after a comma keep
     their fixed lists.
   - A stray letter splits only between two words spelled exactly as typed: with a typo in either half
     ("youbkger" for "you over") it doesn't.

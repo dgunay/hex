@@ -115,7 +115,17 @@ internal class TypingWord(val decoder: SpatialDecoder, val spatial: Boolean) {
      * much likelier than an offer: "the" in "on the table" offers nothing, "by" in "to by a car" offers "buy".
      * Leaves this word reset; a separate instance from the word being typed.
      */
-    fun revisit(text: String, before: String, next: String?, grid: KeyGrid): List<String> {
+    fun revisit(text: String, before: String, next: String?, grid: KeyGrid): List<String> =
+        revisitPool(text, before, next, grid).filter { it.offered && !it.stands }.take(REVISIT_WORDS).map { it.text }
+
+    /** A word [revisitPool] found for a word you went back to: as shown, its taps' cost alone ([spatial]), and whether
+     * the word pairs offer it ([revisit]'s margin). */
+    data class Revisited(val text: String, val spatial: Double, val offered: Boolean, val stands: Boolean = false)
+
+    /** [revisit]'s words and more ([NEURAL_REVISIT] within [NEURAL_REVISIT_MARGIN], the word pairs' order), for Neural
+     * autocorrect to rank by the whole sentence ([revisitOrder]), after the word as it stands ([Revisited.stands]) when
+     * the decoder reads it. Leaves this word reset. */
+    fun revisitPool(text: String, before: String, next: String?, grid: KeyGrid): List<Revisited> {
         reset(before)
         val key = lookup(text.lowercase())
         if (text.length !in 1..MAX_LENGTH || standIn || protected(text)) return emptyList()
@@ -124,12 +134,13 @@ internal class TypingWord(val decoder: SpatialDecoder, val spatial: Boolean) {
         val readings = decoder.revisit(key, taps, previous, nextIndex, suggestSwearWords)
         // The word as it stands: the model's own score, or an unknown word's cost when it has none.
         val own = readings.firstOrNull { it.text == key }?.cost ?: Double.POSITIVE_INFINITY
-        val out = ArrayList<String>(REVISIT_WORDS)
+        val out = ArrayList<Revisited>(NEURAL_REVISIT + 1)
+        readings.firstOrNull { it.text == key }?.let { out.add(Revisited(text, it.cost - it.lm, offered = false, stands = true)) }
         for (r in readings) {
-            if (out.size == REVISIT_WORDS) break
-            if (r.text == key || r.cost > own + REVISIT_MARGIN || blocked(r.text)) continue
+            if (out.count { !it.stands } == NEURAL_REVISIT) break
+            if (r.text == key || r.cost > own + NEURAL_REVISIT_MARGIN || blocked(r.text)) continue
             val shown = if (decoder.personal?.owns(r.text) == true) r.text else matchCase(text, displayed(r.text))
-            if (out.none { it.equals(shown, ignoreCase = true) }) out.add(shown)
+            if (out.none { !it.stands && it.text.equals(shown, ignoreCase = true) }) out.add(Revisited(shown, r.cost - r.lm, r.cost <= own + REVISIT_MARGIN))
         }
         reset()
         return out
@@ -628,6 +639,31 @@ internal class TypingWord(val decoder: SpatialDecoder, val spatial: Boolean) {
         const val REVISIT_WORDS = 3
         /** How much less likely than the word as it stands, in nats, an offer for a revisited word may be. */
         const val REVISIT_MARGIN = 10.0
+        /** Labs › Keyboard › Neural autocorrect reads this many of a revisited word's readings, within this margin. */
+        const val NEURAL_REVISIT = 8
+        const val NEURAL_REVISIT_MARGIN = 20.0
+        /** How much of the sentence after a revisited word the model reads with each reading. */
+        const val REVISIT_REST_CHARS = 80
+
+        /** What Neural autocorrect scores for each of [pool]: the reading with [after] (the text after the word) up to
+         * its sentence's end, so the words after it count as well as those before. */
+        fun revisitWords(pool: List<Revisited>, after: String): List<String> {
+            var rest = after.take(REVISIT_REST_CHARS)
+            val end = rest.indexOfFirst { it == '\n' || it == '.' || it == '!' || it == '?' }
+            rest = if (end >= 0) rest.substring(0, end + 1)
+                else if (after.length > REVISIT_REST_CHARS && ' ' in rest) rest.substring(0, rest.lastIndexOf(' ')) else rest
+            return pool.map { it.text + rest.trimEnd() }
+        }
+
+        /** The words to offer from [pool] in Neural autocorrect's order: each reading's taps and [weight] times the
+         * model's [costs] for it in its sentence ([revisitWords]), none much less likely than the word as it stands
+         * ([REVISIT_MARGIN], as the word pairs'); null when the answer doesn't fit. */
+        fun revisitOrder(pool: List<Revisited>, costs: DoubleArray, weight: Double, margin: Double = REVISIT_MARGIN): List<String>? {
+            if (costs.size != pool.size || costs.any { !it.isFinite() }) return null
+            val total = DoubleArray(pool.size) { pool[it].spatial + weight * costs[it] }
+            val own = pool.indices.firstOrNull { pool[it].stands }?.let { total[it] } ?: Double.POSITIVE_INFINITY
+            return pool.indices.filter { !pool[it].stands && total[it] <= own + margin }.sortedBy { total[it] }.map { pool[it].text }
+        }
         /** How far past its own touch area a likelier letter may reach, in dp, and the nats of odds
          * (ln of how many times likelier) it needs for each dp it claims (iOS letterReach, letterOddsPerPoint). */
         const val REACH = 5.0
