@@ -209,6 +209,9 @@ internal class KeyboardEngine(
         exactField = field.exact
         keyEventEditor = field.keyEvents
         learnsTyping = field.learns
+        TypingLog.skipping = secure || !learnsTyping
+        if (TypingLog.on) TypingLog.write("== field ${attribute.packageName} input=0x${Integer.toHexString(attribute.inputType)} " +
+            "options=0x${Integer.toHexString(attribute.imeOptions)}" + if (TypingLog.skipping) " (not logged)" else "")
         resetTyping(); word = null; clearSpaces(); forgetSwipe(); toldSwipe = false; fixes.clear(); earlier = null
         if (searching != null) { searching = null; surface?.emojiSearch(null, emptyList()) }
         adaptive = adaptiveTouch(); adaptive?.beginSession()
@@ -224,6 +227,7 @@ internal class KeyboardEngine(
         selStart = newSelStart; selEnd = newSelEnd
         dictated?.let { if (!undoable(it)) offerUndo(null) }
         if (oldSelStart != newSelStart || oldSelEnd != newSelEnd) {
+            logAfter { "cursor $oldSelStart,$oldSelEnd → $newSelStart,$newSelEnd" + if (expectedCaret >= 0) " (expected $expectedCaret)" else "" }
             if (expectedCaret >= 0 && (newSelStart != expectedCaret || newSelEnd != expectedCaret)) {
                 // Editors may coalesce selection notifications. Compare the actual surrounding text
                 // before invalidating our own in-flight commit, not a stale intermediate offset.
@@ -509,6 +513,7 @@ internal class KeyboardEngine(
     /** A letter key typed [text] at (x, y) on [grid]'s keys; [explicit] when it was a held option, [aimed] false when the
      * touch slid onto the key, so where it went down says nothing of where you aim. */
     fun letter(text: String, x: Double, y: Double, grid: KeyGrid, explicit: Boolean = false, aimed: Boolean = true) {
+        logAfter { "letter $text @${x.toInt()},${y.toInt()}" + (if (explicit) " explicit" else "") + (if (!aimed) " unaimed" else "") }
         if (!target.connected) return
         searching?.let { if (it.length < SEARCH_LENGTH) it.append(text.lowercase()); showSearch(); return }
         edited()
@@ -555,6 +560,7 @@ internal class KeyboardEngine(
      * key that starts a word. A space right after a picked word is swallowed (it still counts towards
      * double-space), and a closing mark takes its place (in a URL field, also / and the other joiners). */
     fun pickSuggestion(text: String) {
+        logAfter { "pick ${TypingLog.q(text)}" }
         if (pickShortcode(text)) return
         val w = word ?: return
         if (pickSwiped(text) || pickEarlier(text)) return
@@ -598,6 +604,7 @@ internal class KeyboardEngine(
 
     /** The space bar, tapped at [point] in [grid]'s coordinates (null off the letters page). */
     fun space(point: KeyPoint? = null, grid: KeyGrid? = null) {
+        logAfter { "space" + (point?.let { " @${it.x.toInt()},${it.y.toInt()}" } ?: "") }
         if (!target.connected) return
         searching?.let { if (it.isNotEmpty() && it.last() != ' ') it.append(' '); showSearch(); return }
         edited()
@@ -647,12 +654,14 @@ internal class KeyboardEngine(
      * URL field, it is exactly the key's character. The keys' long-press alternates never come here:
      * they type what they show. */
     fun quote(value: Char) {
+        logAfter { "quote $value" }
         if (!target.connected) return
         val placed = if (smartQuotesHere()) SmartQuotes.typed(value, before().lastOrNull()) else value
         type(placed.toString())
     }
 
     fun type(value: String) {
+        logAfter { "type ${TypingLog.q(value)}" }
         if (!target.connected) return
         searching?.let { q ->
             if (value == " ") space() else if (value == "\n") endEmojiSearch()
@@ -702,6 +711,26 @@ internal class KeyboardEngine(
         if (!showShortcode()) showPredictions(if (w != null) before() else null)
         inputDone()
     }
+    /** Labs › Keyboard › Typing log: once [event] has been handled (posted, so after everything it does at once), the
+     * text around the cursor and the space and fix state it left. Off, or in a field it skips, nothing is read. */
+    private inline fun logAfter(event: () -> String) {
+        if (TypingLog.on && !TypingLog.skipping) { val e = event(); main.post { logState(e) } }
+    }
+    private fun logState(event: String) {
+        if (secure) return
+        TypingLog.event {
+            val anchors = listOfNotNull("space".takeIf { spaceAnchor != null }, "picked".takeIf { pickedAnchor != null },
+                "fixed".takeIf { fixedAnchor != null }, "held".takeIf { heldAnchor != null }, "swipe".takeIf { swipeAnchor != null })
+            "$event | ${TypingLog.q(target.before(60))} ‸ ${TypingLog.q(target.after(20))} word=${TypingLog.q(word?.token)}" +
+                (undo?.let { " undo=${TypingLog.q(it.original)}→${TypingLog.q(it.replacement)}" } ?: "") +
+                (if (anchors.isEmpty()) "" else " anchors=" + anchors.joinToString(",")) + " sel=$selStart,$selEnd"
+        }
+    }
+    /** The Hex menu's Mark a problem: a marker in the typing log, with the text as it is now. */
+    fun markProblem() {
+        if (TypingLog.skipping) TypingLog.write("★ MARK (field not logged)") else logState("★ MARK")
+    }
+
     /** Labs › Keyboard › Emoji search: what has been searched while the letter keys type into it, else null. */
     private var searching: StringBuilder? = null
     val emojiSearching get() = searching != null
@@ -731,6 +760,7 @@ internal class KeyboardEngine(
     }
     /** A found emoji tapped: it goes in, and the search stays for another. */
     fun pickSearchedEmoji(text: String) {
+        logAfter { "emoji search pick $text" }
         if (searching == null || !target.connected) return
         takeHeldSpace(before()); target.commit(text)
         onEmojiPicked(text)
@@ -770,6 +800,7 @@ internal class KeyboardEngine(
         return true
     }
     fun delete() {
+        logAfter { "delete" }
         if (!target.connected) return
         searching?.let { if (it.isNotEmpty()) it.setLength(it.length - 1); showSearch(); return }
         // Hex's own Delete is the person removing text, so a field that then empties was cleared by them.
@@ -811,9 +842,10 @@ internal class KeyboardEngine(
     }
     /** Text went in through the editor's own paste (the strip's Paste tool): the word in progress is not
      * what is before the cursor any more. */
-    fun pasted() { edited(); adaptive?.forget(); resetTyping(); clearSpaces(); surface?.suggestions(emptyList()) }
+    fun pasted() { logAfter { "paste" }; edited(); adaptive?.forget(); resetTyping(); clearSpaces(); surface?.suggestions(emptyList()) }
 
     fun enter() {
+        logAfter { "enter" }
         if (searching != null) { endEmojiSearch(); return }
         edited(); adaptive?.forget()
         // A text replacement that ends the text goes in before the line break or the editor's action.
@@ -837,6 +869,7 @@ internal class KeyboardEngine(
     /** A space-bar slide starts moving the cursor: the word in progress stays as typed. A field whose text
      * isn't there to read, a password or a TYPE_NULL editor, steps with arrow keys instead. */
     fun cursorSlide(): CursorSlide {
+        logAfter { "cursor slide" }
         adaptive?.forget(); resetTyping(); clearSpaces(); surface?.suggestions(emptyList())
         return CursorSlide(target, minOf(selStart, selEnd), maxOf(selStart, selEnd),
             readable = !secure && !keyEventEditor)
@@ -845,6 +878,7 @@ internal class KeyboardEngine(
     /** A slide left from delete: null where it can't run (a password or TYPE_NULL field, a selection, no known
      * cursor). */
     fun deleteSlide(): DeleteSlide? {
+        logAfter { "delete slide" }
         if (secure || keyEventEditor || selStart < 0 || selStart != selEnd || !target.connected) return null
         adaptive?.forget(); resetTyping(); clearSpaces(); surface?.suggestions(emptyList())
         return DeleteSlide(target, selStart, target.before(2000).orEmpty())
@@ -853,6 +887,7 @@ internal class KeyboardEngine(
      * with the spaces and punctuation after it, as a delete slide's words do. False where words can't be
      * read (a password or TYPE_NULL field, a selection, no known cursor): the hold goes on letter by letter. */
     fun deleteWord(): Boolean {
+        logAfter { "delete word" }
         searching?.let { q -> q.setLength(q.trimEnd().lastIndexOf(' ').coerceAtLeast(0)); showSearch(); return true }
         if (secure || keyEventEditor || selStart < 0 || selStart != selEnd || !target.connected) return false
         val length = DeleteSlide.wordLengths(target.before(200).orEmpty()).firstOrNull() ?: return false
@@ -862,6 +897,7 @@ internal class KeyboardEngine(
     }
     /** The delete slide lifted with words selected: they go. */
     fun deleteSelection() {
+        logAfter { "delete selection" }
         if (!target.connected) return
         tracker.keyboardRemoved()
         edited(); adaptive?.forget()
@@ -890,7 +926,8 @@ internal class KeyboardEngine(
      * signature while the signed text is still right before the cursor, so it is never lowercased or
      * spaced onto the signature line. */
     fun insertDictation(text: String, language: String?, signature: Boolean = false, heard: String? = null,
-                        learn: Boolean = false) {
+                        learn: Boolean = false) {        logAfter { "dictation ${TypingLog.q(text)}" }
+
         if (!target.connected) return
         val before = if (secure) null else target.before(maxOf(64, continuation.reach))
         // The lab's anchors; off, the single character spacing has always read.
@@ -941,6 +978,7 @@ internal class KeyboardEngine(
     /** The strip's Undo tool: the last autocorrection goes back to exactly what was typed, as Delete
      * right after it does, and what was typed shows as the literal chip. */
     fun undoAutocorrection() {
+        logAfter { "undo autocorrection" }
         if (!canUndoAutocorrection) { surface?.toolsChanged(); return }
         edited(); clearSpaces()
         val last = undo ?: return
@@ -1051,6 +1089,7 @@ internal class KeyboardEngine(
      * space unless the text before ends in one or in opening punctuation, with a capital from shift or the sentence,
      * and the strip offers the next three. The next tapped letter goes in after a space; a closing mark against it. */
     fun endSwipe(readings: List<String>) {
+        logAfter { "swipe " + readings.take(5).joinToString(",") }
         if (!swiping) return
         swiping = false
         val w = word

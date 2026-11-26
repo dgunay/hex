@@ -64,6 +64,7 @@ internal class SpeechMenu(context: Context, private val ime: HexKeyboard,
                 // Labs › Keyboard › Clipboard history; never in a password field.
                 if (ime.feedback.clipboardHistory && !ime.engine.secure)
                     row(s(R.string.keyboard_menu_clipboard), s(R.string.keyboard_menu_arrow)) { clipboardPage(direct = false) }
+                if (TypingLog.on) row(s(R.string.keyboard_menu_mark_problem), "") { ime.engine.markProblem(); close() }
                 row(s(R.string.keyboard_menu_style), more(s(prefs.style.label))) { show(Page.Style) }
                 row(s(R.string.keyboard_menu_language), more(prefs.language?.label ?: automatic())) { show(Page.Language) }
                 if (prefs.translation && prefs.translatable)

@@ -133,6 +133,12 @@ class HexKeyboard : InputMethodService() {
             adaptiveTouch = { if (feedback.adaptiveTouch) AdaptiveTouchStore.get(this) else null },
             swipeUnavailable = ::swipeUnavailable, learnWord = ::learnWord)
     }
+    /** Labs › Keyboard › Typing log turned on or off; on, the log starts with the settings typing reads. */
+    private fun typingLogChanged() {
+        TypingLog.configure(this, feedback.typingLog)
+        if (TypingLog.on) TypingLog.write("== settings " + getSharedPreferences("typing", MODE_PRIVATE).all
+            .filter { it.value is Boolean || it.key == TypingPreferences.NEURAL_BUDGET }.toSortedMap().entries.joinToString(" "))
+    }
     private fun neuralChanged() = NeuralAutocorrect.configure(this, feedback.neuralAutocorrect, feedback.neuralBudget)
     private val typingChanged = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
         if (key == TypingPreferences.SUGGEST_SWEAR_WORDS) engine.swearWordsChanged()
@@ -151,6 +157,8 @@ class HexKeyboard : InputMethodService() {
         if (key == TypingPreferences.HEX_KEY_LEFT) view?.hexKeySideChanged()
         if (key == TypingPreferences.USE_IMPORTED_WORDS || key == TypingPreferences.IMPORTED_WORDS) engine.personalWordsChanged()
         if (key == TypingPreferences.CLIPBOARD_HISTORY) clipKeeper.sync()
+        if (key == TypingPreferences.TYPING_LOG) typingLogChanged()
+        else if (key != null && TypingLog.on) TypingLog.write("== setting $key = ${getSharedPreferences("typing", MODE_PRIVATE).all[key]?.takeIf { it is Boolean || it is Number }}")
     }
     // The strip's Paste tool comes and goes with the clipboard (Labs › Keyboard › Keyboard tools): the
     // listener exists only while the lab is on and the input view is shown.
@@ -214,6 +222,7 @@ class HexKeyboard : InputMethodService() {
         super.onCreate()
         getSharedPreferences("typing", MODE_PRIVATE).registerOnSharedPreferenceChangeListener(typingChanged)
         neuralChanged()
+        typingLogChanged()
         contentResolver.registerContentObserver(UserDictionary.Words.CONTENT_URI, true, dictionaryChanged)
         capture = MicCapture(LocalSpeech(applicationContext), DictationPlace.Keyboard, update = ::showStatus, meter = ::showLevel,
             insert = ::commitSpeech, sounds = ly.anoma.hex.speech.DictationSounds.of(this))

@@ -195,6 +195,9 @@
     <string name="labs_output">Output</string>
     <string name="labs_keyboard">Keyboard</string>
     <string name="emoji_suggestions">Emoji suggestions</string>
+    <string name="typing_log">Typing log</string>
+    <string name="typing_log_detail">Keep a log of keys, suggestions and the text around the cursor on this phone, to find spacing and punctuation mistakes. Password fields and incognito fields are never logged. Up to 200 MB; nothing is sent anywhere. Mark a problem from the Hex menu.</string>
+    <string name="typing_log_delete">Delete typing log</string>
     <string name="emoji_search">Emoji search</string>
     <string name="emoji_search_detail">A search key in the emoji panel: type a word, such as “laugh”, to find its emoji</string>
     <string name="emoji_shortcodes">Emoji shortcodes</string>
