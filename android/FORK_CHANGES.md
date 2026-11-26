@@ -69,6 +69,8 @@ Each setting's commits still use the names it had when it was added. Commit hash
 
   - **Bottom row:** ?123, emoji, comma, space, period, enter (the emoji key before the comma).
   - **Held period:** one row, `! , . ?`, with the period selected.
+    A sideways slide opens it at once, with no wait for the hold, and the finger already picks: a flick one key
+    left types `,`, two `!`, one right `?`.
   - **Held comma:** on the letters, a dictation as the Hex key held starts one (after 350 ms), finished when the comma
     lifts; it types no comma. SwiftKey's comma holds its voice typing.
   - **123 page:** digits; `@ # $ & _ - ( ) = %`; then `{&=`, `" * ' : / ! ? +` and delete. Its bottom row

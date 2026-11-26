@@ -35,6 +35,7 @@ import ly.anoma.hex.typing.KeyRect
 import ly.anoma.hex.typing.TouchPlane
 import ly.anoma.hex.typing.TypingWord
 import ly.anoma.hex.useInter
+import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /** The keys: three rows from the page's layout, then ?123, comma, space, period and enter. Every
@@ -281,6 +282,8 @@ internal class KeyPlaneView(context: Context, private val ime: HexKeyboard, priv
         typesOnLift(period, preview = { null },
             holds = { if (current?.symbols == false) periodHolds() else listOf(LetterFeedback.symbolHolds(periodText(current)[0])) },
             default = { if (current?.symbols == false) (if (swiftKeyDrawn) LetterFeedback.SWIFTKEY_PERIOD_DEFAULT else LetterFeedback.PERIOD_DEFAULT) else 0 },
+            // SwiftKey's period: a slide sideways picks its punctuation at once, with no wait for the hold.
+            flicks = { swiftKeyDrawn && current?.symbols == false },
             type = { option -> if (option != null) ime.engine.type(option) else period.performClick() })
         bottomSlides[period] = { ime.engine.type(periodText(current)) }
         enterKey = caps.cap("", context.getString(R.string.keyboard_return), modifier, 17f, ime.engine::enter)
@@ -754,7 +757,9 @@ internal class KeyPlaneView(context: Context, private val ime: HexKeyboard, priv
      * chosen, or null for the key's own. */
     private fun typesOnLift(k: KeyCap, preview: () -> String?, holds: () -> List<List<String>>, default: () -> Int = { 0 },
                             swipes: Boolean = false, down: (MotionEvent) -> Unit = {}, type: (String?) -> Unit, done: () -> Unit = {},
-                            cancelled: () -> Unit = done) {
+                            cancelled: () -> Unit = done, flicks: () -> Boolean = { false }) {
+        // Where the finger went down, for [flicks]: a key whose held options open at once as it slides sideways.
+        var downX = 0f
         fun finish(): Boolean {
             // The key types: its touch is no swipe any more.
             if (strokeKey === k && swipe == null) forgetStroke()
@@ -773,7 +778,7 @@ internal class KeyPlaneView(context: Context, private val ime: HexKeyboard, priv
                     if (e.actionMasked == MotionEvent.ACTION_POINTER_DOWN && roll.up(k)) finish()
                     roll.down(k) { finish() }
                     if (swipes && e.actionMasked == MotionEvent.ACTION_DOWN) strokeBegan(k, e)
-                    clearCallout(); v.isPressed = true
+                    clearCallout(); v.isPressed = true; downX = e.x
                     down(e)
                     val shown = preview()
                     if (shown != null && ime.feedback.popups && ime.previewAllowed) feedback.present(k.face, listOf(shown))
@@ -785,6 +790,9 @@ internal class KeyPlaneView(context: Context, private val ime: HexKeyboard, priv
                 }
                 MotionEvent.ACTION_MOVE -> {
                     if (swipes && strokeMoved(k, e)) return@setOnTouchListener true
+                    // A flick: the held options open now, under the finger, which already picks among them.
+                    if (!feedback.choosing && v.isPressed && flicks() && abs(e.x - downX) > slop)
+                        pendingAccents?.let { removeCallbacks(it); it.run() }
                     if (feedback.choosing && v.isPressed) { val (x, y) = inHost(v, e); feedback.move(x, y) }
                     else if (e.x < -slop || e.x > v.width + slop || e.y < -slop || e.y > v.height + slop) {
                         if (v.isPressed) clearCallout()
