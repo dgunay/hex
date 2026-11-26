@@ -136,6 +136,22 @@ class NeuralAutocorrectTest {
         assertTrue("a sentence's start isn't asked", stand.asked.isEmpty())
     }
 
+    @Test fun theModelRanksAWordYouWentBackTo() {
+        val w = TypingWord(SpatialDecoder(model), true)
+        val pool = w.revisitPool("by", "I want to ", "a", grid)
+        assertTrue("the word as it stands is read too: $pool", pool.first().stands && pool.first().text == "by")
+        val asked = TypingWord.revisitWords(pool, " a car. Then home")
+        assertEquals("each reading with the rest of its sentence", "by a car.", asked.first())
+        val likes = asked.first { it.startsWith("bt ") || it.startsWith("bu") && it != "buy a car." }
+        val order = TypingWord.revisitOrder(pool, Stand(setOf(likes)).costs("I want to", asked)!!, 1.5)!!
+        assertEquals("the model's likeliest in its sentence first", likes.substringBefore(' '), order.first())
+        assertEquals("nothing for a word the model finds right", emptyList<String>(),
+            TypingWord.revisitOrder(pool, Stand(setOf("by a car.")).costs("I want to", asked)!!, 1.5))
+        assertEquals(null, TypingWord.revisitOrder(pool, DoubleArray(1), 1.5))
+        assertEquals("without the model, what the word pairs offer", w.revisit("by", "I want to ", "a", grid),
+            pool.filter { it.offered && !it.stands }.take(TypingWord.REVISIT_WORDS).map { it.text })
+    }
+
     @Test fun aShownWordKeepsItsSlot() {
         fun w(t: String) = Suggestion(t, Suggestion.Kind.Word)
         val first = Suggestion.place(listOf(Suggestion("gon", Suggestion.Kind.Typed), w("gonna"), w("gone")), null)
