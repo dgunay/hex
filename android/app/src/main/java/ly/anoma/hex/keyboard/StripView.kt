@@ -295,7 +295,7 @@ internal class StripView(context: Context, private val ime: HexKeyboard, private
         when (e.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 held = false; tracking = true; originX = e.x; originY = e.y; v.isPressed = true
-                postDelayed(hold, 350)
+                postDelayed(hold, ime.feedback.talkHold)
             }
             MotionEvent.ACTION_MOVE -> if (!held && tracking && hypot(originX - e.x, originY - e.y) > slide) {
                 removeCallbacks(hold); host.openMenu()

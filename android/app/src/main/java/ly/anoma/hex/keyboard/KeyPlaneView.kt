@@ -766,10 +766,10 @@ internal class KeyPlaneView(context: Context, private val ime: HexKeyboard, priv
         item?.performClick()
     }
 
-    /** Touches for a key that types as it lifts: pressed, its pop-up, after [KeyboardMetrics.HOLD_MS] its held
+    /** Touches for a key that types as it lifts: pressed, its pop-up, after Labs › Keyboard › Hold delay its held
      * options to slide over, and on lifting (or when another key goes down first) [type] with the option
      * chosen, or null for the key's own. [ordered]: the held row keeps its order wherever the key is. [flicks]: a sideways slide opens the held options at
-     * once and the finger already picks among them. [talks]: held still for [KeyboardMetrics.TALK_HOLD_MS], the key
+     * once and the finger already picks among them. [talks]: held still for Hold delay's [ly.anoma.hex.typing.TypingPreferences.talkHold], the key
      * dictates as the Hex key held does, finished as it lifts, and types nothing (SwiftKey layout's comma). */
     private fun typesOnLift(k: KeyCap, preview: () -> String?, holds: () -> List<List<String>>, default: () -> Int = { 0 },
                             swipes: Boolean = false, down: (MotionEvent) -> Unit = {}, type: (String?) -> Unit, done: () -> Unit = {},
@@ -805,7 +805,7 @@ internal class KeyPlaneView(context: Context, private val ime: HexKeyboard, priv
                             pendingTalk = null
                             if (v.isPressed && ime.beginSpeech()) { talkingKey = k; roll.up(k); clearCallout() }
                         }
-                        postDelayed(pendingTalk!!, KeyboardMetrics.TALK_HOLD_MS)
+                        postDelayed(pendingTalk!!, ime.feedback.talkHold)
                     } else if (options.firstOrNull().isNullOrEmpty().not()) {
                         pendingAccents = Runnable {
                             if (!v.isPressed) return@Runnable
@@ -813,7 +813,7 @@ internal class KeyPlaneView(context: Context, private val ime: HexKeyboard, priv
                             // Labs › Keyboard › Click when a hold opens: the press's click, felt as the options appear.
                             if (ime.feedback.holdClick && ime.feedback.haptics) tap(context, true, Tap.Press)
                         }
-                        postDelayed(pendingAccents!!, KeyboardMetrics.HOLD_MS)
+                        postDelayed(pendingAccents!!, ime.feedback.holdDelay.toLong())
                     }
                 }
                 MotionEvent.ACTION_MOVE -> {

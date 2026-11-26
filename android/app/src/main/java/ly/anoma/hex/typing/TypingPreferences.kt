@@ -57,6 +57,13 @@ internal class TypingPreferences(context: Context) {
     var fixEarlierWords: Boolean
         get() = prefs.getBoolean("fixEarlierWords", false)
         set(value) { prefs.edit().putBoolean("fixEarlierWords", value).apply() }
+    /** Labs › Keyboard › Hold delay: how long a key is held, in ms, before its symbols and accents show. The Hex key
+     * (and SwiftKey layout's comma) start a dictation 50 ms later, never sooner than [TALK_HOLD_FLOOR]. */
+    var holdDelay: Int
+        get() = prefs.getInt(HOLD_DELAY, HOLD_DELAY_DEFAULT).coerceIn(HOLD_DELAY_RANGE)
+        set(value) { prefs.edit().putInt(HOLD_DELAY, value.coerceIn(HOLD_DELAY_RANGE)).apply() }
+    /** The hold that starts a dictation, from [holdDelay]: 350 ms at the default 300. */
+    val talkHold: Long get() = maxOf(TALK_HOLD_FLOOR, holdDelay + 50).toLong()
     /** Labs › Keyboard › Local currency: the phone's own currency on the ?123 page and d's held symbol
      * instead of $. Off by default. */
     var localCurrency: Boolean
@@ -239,6 +246,11 @@ internal class TypingPreferences(context: Context) {
     companion object {
         const val SUGGEST_SWEAR_WORDS = "suggestSwearWords"
         const val NUMBER_ROW = "numberRow"
+        const val HOLD_DELAY = "holdDelay"
+        const val HOLD_DELAY_DEFAULT = 300
+        val HOLD_DELAY_RANGE = 100..600
+        /** A dictation's hold never starts sooner: a slow tap on the Hex key or the comma stays a tap. */
+        const val TALK_HOLD_FLOOR = 250
         const val SNUG_BOTTOM = "snugBottom"
         const val LOCAL_CURRENCY = "localCurrency"
         const val EMOJI_SUGGESTIONS = "emojiSuggestions"

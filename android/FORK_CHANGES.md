@@ -54,6 +54,50 @@ Each setting's commits still use the names it had when it was added. Commit hash
   word scrolls back to the start.
 - **Commit:** Android Keyboard: Steadier suggestion strip, and More suggestions (Labs).
 
+### Hold delay (Labs)
+
+- **Setting:** Labs › Keyboard › Hold delay, 100–600 ms in steps of 25 (300, upstream's fixed value).
+- **What:** how long a key is held before its symbols and accents show (letters, period, comma on =<, the symbol
+  pages and the number row). Holding the Hex key, or SwiftKey layout's comma, starts a dictation 50 ms after it,
+  never sooner than 250 ms so a slow tap stays a tap: 350 ms at the default, as before.
+- **Why:** upstream's 300 ms (Gboard's) is fixed; asked for to make held symbols quicker.
+- **How:** `TypingPreferences.holdDelay`/`talkHold`, read at each press, in place of `KeyboardMetrics.HOLD_MS` and
+  `TALK_HOLD_MS`.
+- **Limits:** the space bar's long press (the language menu) keeps Android's own delay (Accessibility › Touch & hold
+  delay).
+
+### SwiftKey layout (Labs)
+
+- **Switch:** Labs › Keyboard › SwiftKey layout (off).
+- **What:** Microsoft SwiftKey's arrangement (English QWERTY, Android), for muscle memory carried over from it
+  (anomalyco/hex#2748, closed upstream without a change):
+  - **Held letters:** SwiftKey's symbols, shown as key hints, whether or not Symbols on letter keys is on:
+
+    ```text
+    q w e r t y u i o p    % ^ ~ | [ ] < > { }   (only beside the Number row; otherwise the digits)
+    a s d f g h j k l      @ # & * - + = ( )
+    z x c v b n m          _ $ " ' : ; /
+    ```
+
+  - **Bottom row:** ?123, emoji, comma, space, period, enter (the emoji key before the comma).
+  - **Held period:** one row, `! , . ?`, with the period selected.
+    A sideways slide opens it at once, with no wait for the hold, and the finger already picks: a flick one key
+    left types `,`, two `!`, one right `?`.
+  - **Held comma:** on the letters, a dictation as the Hex key held starts one (after 350 ms), finished when the comma
+    lifts; it types no comma. SwiftKey's comma holds its voice typing.
+  - **123 page:** digits; `@ # $ & _ - ( ) = %`; then `{&=`, `" * ' : / ! ? +` and delete. Its bottom row
+    has no emoji key: ABC, comma, a wider space, period, enter.
+  - **{&= page:** `£ € ¥ ¢ © ® ™ ~ ¿`; Tab, `[ ] { } < > ^ ¡`; then 123, `` ` ; ÷ \ | ¦ ¬ `` and delete; and
+    ABC, space, `× § ¶ °`, enter.
+- **How:** `LetterFeedback.letterSymbol(swiftKey)`, `KeyboardLetters.swiftKeyNumbers`/`swiftKeySymbols`, and
+  `KeyPlaneView.layBottom`, which moves and hides the bottom row's keys in place (`KeyRowLayout.place`, gone keys
+  take no room) so a finger already on ?123 keeps its press. Tab types a tab character.
+- **Limits:**
+  - Taken from screenshots of SwiftKey on one phone; the symbol pages' keys aren't sized exactly as SwiftKey's.
+  - A local currency (Labs) takes $'s place on x and the 123 page, and $ takes its slot on {&=, as on Gboard's
+    pages.
+  - The comma has no microphone hint, as SwiftKey's does.
+
 ## Delete
 
 ### Delete words when held
