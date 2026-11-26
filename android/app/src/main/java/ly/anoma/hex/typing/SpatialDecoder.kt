@@ -46,7 +46,7 @@ internal class SpatialDecoder(val model: TypingModel) {
         fun costs(context: String, words: List<String>): DoubleArray?
         /** [costs] without waiting: [answer] gets them on another thread once they are known, or never, when a later
          * call has taken this one's place first (typing goes faster than the model). For the strip's completions. */
-        fun costsLater(context: String, words: List<String>, answer: (DoubleArray) -> Unit) {
+        fun costsLater(context: String, words: List<String>, kind: String = "strip", answer: (DoubleArray) -> Unit) {
             costs(context, words)?.let(answer)
         }
         /** Whether it would answer: off, or its model not loaded, the decoder doesn't ask. */

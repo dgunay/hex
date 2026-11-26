@@ -12,6 +12,7 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
+import ly.anoma.hex.keyboard.TypingLog
 
 /**
  * Labs › Keyboard › Neural autocorrect as the keyboard runs it: English's decoder asks it ([SpatialDecoder.neural]) for
@@ -84,6 +85,13 @@ internal object NeuralAutocorrect : SpatialDecoder.NeuralScorer {
         }, 60, 60, TimeUnit.SECONDS)
     }
 
+    /** What the worker is running now, for Labs › Keyboard › Typing log's timings: what space's word waits behind. */
+    @Volatile private var running: String? = null
+    private inline fun <T> run(what: String, work: () -> T): T {
+        running = what
+        try { return work() } finally { running = null }
+    }
+
     private val nextPrepare = AtomicReference<String?>(null)
     private val preparing = AtomicBoolean(false)
 
@@ -95,7 +103,9 @@ internal object NeuralAutocorrect : SpatialDecoder.NeuralScorer {
         worker.execute {
             preparing.set(false)
             val text = nextPrepare.getAndSet(null) ?: return@execute
-            model?.prepare(text)
+            val started = SystemClock.elapsedRealtime()
+            run("context") { model?.prepare(text) }
+            TypingLog.event { "neural context ${SystemClock.elapsedRealtime() - started}ms (${text.length} chars)" }
         }
     }
 
@@ -110,28 +120,39 @@ internal object NeuralAutocorrect : SpatialDecoder.NeuralScorer {
             if (memoContext != context) { memo.clear(); memoContext = context }
             words.filter { it !in memo }
         }
+        if (missing.isEmpty()) TypingLog.event { "neural space 0ms: all ${words.size} already read" }
         if (missing.isNotEmpty()) {
             val started = SystemClock.elapsedRealtime()
+            val behind = running
+            var ranAt = 0L
             val job: Future<Boolean> = worker.submit<Boolean> {
-                val out = m.costs(context, missing) ?: return@submit false
+                ranAt = SystemClock.elapsedRealtime()
+                val out = run("space") { m.costs(context, missing) } ?: return@submit false
                 synchronized(memo) { if (memoContext == context) missing.indices.forEach { memo[missing[it]] = out[it] } }
                 true
             }
             val answered = try { job.get(budgetMs, TimeUnit.MILLISECONDS) } catch (_: TimeoutException) { null } catch (_: Exception) { false }
-            record(SystemClock.elapsedRealtime() - started, answered == null)
+            val ended = SystemClock.elapsedRealtime()
+            record(ended - started, answered == null)
+            TypingLog.event {
+                val queued = if (ranAt > 0) ranAt - started else ended - started
+                "neural space ${ended - started}ms: queued ${queued}ms" + (behind?.let { " behind $it" } ?: "") +
+                    (if (ranAt > 0) ", ran ${ended - ranAt}ms" else ", not started") + " for ${missing.size} of ${words.size} words" +
+                    (if (answered == null) ", too late" else "")
+            }
             if (answered != true) return null
         }
         return synchronized(memo) { if (memoContext != context) null else DoubleArray(words.size) { memo[words[it]] ?: Double.NaN } }
     }
 
-    private class Later(val context: String, val words: List<String>, val answer: (DoubleArray) -> Unit)
+    private class Later(val context: String, val words: List<String>, val kind: String, val answer: (DoubleArray) -> Unit)
     private val nextLater = AtomicReference<Later?>(null)
     private val laterQueued = AtomicBoolean(false)
 
-    override fun costsLater(context: String, words: List<String>, answer: (DoubleArray) -> Unit) {
+    override fun costsLater(context: String, words: List<String>, kind: String, answer: (DoubleArray) -> Unit) {
         lastUse = SystemClock.elapsedRealtime()
         if (model == null) return
-        nextLater.set(Later(context, words, answer))
+        nextLater.set(Later(context, words, kind, answer))
         // One request queued at a time, the latest: the completions of a word typed on are never decoded.
         if (laterQueued.compareAndSet(false, true)) worker.execute(::later)
     }
@@ -148,7 +169,9 @@ internal object NeuralAutocorrect : SpatialDecoder.NeuralScorer {
         }
         if (missing.isNotEmpty()) {
             val batch = missing.take(12)
-            val out = m.costs(later.context, batch) ?: return
+            val started = SystemClock.elapsedRealtime()
+            val out = run("${later.kind} batch") { m.costs(later.context, batch) } ?: return
+            TypingLog.event { "neural ${later.kind} batch ${SystemClock.elapsedRealtime() - started}ms for ${batch.size} words" }
             synchronized(memo) { if (memoContext == later.context) batch.indices.forEach { memo[batch[it]] = out[it] } }
             if (missing.size > batch.size) {
                 if (nextLater.compareAndSet(null, later) && laterQueued.compareAndSet(false, true)) worker.execute(::later)

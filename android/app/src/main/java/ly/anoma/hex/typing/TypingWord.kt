@@ -316,7 +316,7 @@ internal class TypingWord(val decoder: SpatialDecoder, val spatial: Boolean) {
         val capital = token.first().isUpperCase()
         val list = words.toList()
         val shownToModel = list.map { if (capital) it.replaceFirstChar(Char::uppercaseChar) else it }
-        neural.costsLater(before, shownToModel) { costs ->
+        neural.costsLater(before, shownToModel, "completions") { costs ->
             post {
                 if (asked != key) return@post
                 ranked = key to list.indices.sortedBy { costs[it] }.map { list[it] }
@@ -350,7 +350,7 @@ internal class TypingWord(val decoder: SpatialDecoder, val spatial: Boolean) {
         if (list.size < 2) return
         askedNext = text
         // Written for the model as the strip shows them ("I", names with their capital).
-        neural.costsLater(text, list.map { displayed(it) }) { costs ->
+        neural.costsLater(text, list.map { displayed(it) }, "next words") { costs ->
             post {
                 if (askedNext != text) return@post
                 rankedNext = text to list.indices.sortedBy { costs[it] }.map { list[it] }
