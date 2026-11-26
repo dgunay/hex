@@ -119,6 +119,9 @@
     <string name="keyboard_height_mid_tall">Mid-tall</string>
     <string name="keyboard_height_tall">Tall</string>
     <string name="keyboard_height_extra_tall">Extra tall</string>
+    <string name="settings_key_click_volume">Key click volume</string>
+    <string name="key_click_volume_detail">Sets how loud keys click, instead of the phone’s level</string>
+    <string name="key_click_level">Volume</string>
     <string name="settings_autocorrect">Autocorrect</string>
     <string name="settings_autocorrect_detail">Fixes typos when you press space</string>
     <string name="settings_spatial">Spatial autocorrect</string>

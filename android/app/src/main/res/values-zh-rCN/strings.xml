@@ -106,6 +106,9 @@
     <string name="keyboard_height_mid_tall">中高</string>
     <string name="keyboard_height_tall">高</string>
     <string name="keyboard_height_extra_tall">特高</string>
+    <string name="settings_key_click_volume">按键音量</string>
+    <string name="key_click_volume_detail">自己设定按键音的大小，而不用手机的音量</string>
+    <string name="key_click_level">音量</string>
     <string name="settings_autocorrect">自动改正</string>
     <string name="settings_autocorrect_detail">按空格时修正拼写错误</string>
     <string name="settings_spatial">按触点自动改正</string>

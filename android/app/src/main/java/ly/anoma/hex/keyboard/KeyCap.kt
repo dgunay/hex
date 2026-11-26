@@ -21,7 +21,8 @@ import kotlin.math.roundToInt
 
 /** One key. The whole view is its touch target; its padding places the drawn keycap (KeyRowLayout sets it). */
 internal class KeyCap(context: Context, fill: Int, private val paints: KeyPaints, description: String,
-                      private val haptics: () -> Boolean, click: () -> Unit) : FrameLayout(context) {
+                      private val haptics: () -> Boolean, private val clickVolume: () -> Float?,
+                      click: () -> Unit) : FrameLayout(context) {
     private val slop = ViewConfiguration.get(context).scaledTouchSlop
     var label: TextView? = null
     /** The label's size in dp at Gboard's letter keycap; the drawn size follows this key's keycap ([KeyLabels]). */
@@ -63,7 +64,7 @@ internal class KeyCap(context: Context, fill: Int, private val paints: KeyPaints
         if (event.actionMasked == MotionEvent.ACTION_DOWN || event.actionMasked == MotionEvent.ACTION_POINTER_DOWN) {
             downAt = event.eventTime
             tap(context, haptics(), Tap.Press)
-            context.getSystemService(AudioManager::class.java)?.playSoundEffect(sound)
+            click(context, sound, clickVolume())
         }
         if (event.actionMasked == MotionEvent.ACTION_UP) liftAt = event.eventTime
         return super.dispatchTouchEvent(event)
@@ -135,9 +136,22 @@ internal class KeyCap(context: Context, fill: Int, private val paints: KeyPaints
     }
 }
 
-/** Builds keys with the keyboard's colours and haptics setting. */
+/** Settings › Keyboard › Key click volume's slider, 5–100%, as the raw scalar [AudioManager.playSoundEffect] takes:
+ * 100% is full level and every 10% is 3 dB less, as ears hear loudness (50% is −15 dB, 5% −28.5 dB). */
+internal fun clickScalar(percent: Int) = Math.pow(10.0, -30.0 * (1 - percent.coerceIn(0, 100) / 100.0) / 20).toFloat()
+
+/** A key click [sound] when the system's Touch sounds are on: at the phone's own level, or at [volume] (a raw scalar,
+ * [clickScalar]). The level-less call checks Touch sounds itself; the one with a volume doesn't, so it is read here. */
+internal fun click(context: Context, sound: Int, volume: Float?) {
+    val audio = context.getSystemService(AudioManager::class.java) ?: return
+    if (volume == null) { audio.playSoundEffect(sound); return }
+    if (android.provider.Settings.System.getInt(context.contentResolver, android.provider.Settings.System.SOUND_EFFECTS_ENABLED, 1) == 0) return
+    audio.playSoundEffect(sound, volume)
+}
+
+/** Builds keys with the keyboard's colours, haptics and key click settings. */
 internal class KeyCaps(private val context: Context, val paints: KeyPaints, private val labelBase: Float,
-                       private val haptics: () -> Boolean) {
+                       private val haptics: () -> Boolean, private val clickVolume: () -> Float? = { null }) {
     private fun dp(value: Int) = (value * context.resources.displayMetrics.density).roundToInt()
     val ink = paints.ink
     val key = paints.key
@@ -146,7 +160,7 @@ internal class KeyCaps(private val context: Context, val paints: KeyPaints, priv
     /** Letters are Gboard's size (19.4 dp capitals) on its Pixel 8 keycap; labels such as ?123 are smaller. [size]
      * is in dp at that keycap: the drawn size follows each key's own ([KeyLabels]). */
     fun cap(s: String, desc: String, fill: Int = key, size: Float = 26f, click: () -> Unit): KeyCap {
-        val c = KeyCap(context, fill, paints, desc, haptics, click)
+        val c = KeyCap(context, fill, paints, desc, haptics, clickVolume, click)
         c.labelSize = size; c.labelBase = labelBase
         c.label = TextView(context).apply {
             text = s; useInter(if (size >= 20f) 400 else 500)
@@ -157,7 +171,7 @@ internal class KeyCaps(private val context: Context, val paints: KeyPaints, priv
         return c
     }
     fun icon(res: Int, desc: String, fill: Int, click: () -> Unit, tint: Int = ink, size: Int = 24): KeyCap {
-        val c = KeyCap(context, fill, paints, desc, haptics, click)
+        val c = KeyCap(context, fill, paints, desc, haptics, clickVolume, click)
         val image = ImageView(context).apply {
             setImageResource(res); imageTintList = ColorStateList.valueOf(tint)
         }

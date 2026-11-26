@@ -26,6 +26,18 @@ Each setting's commits still use the names it had when it was added. Commit hash
   bar.
 - **Commit:** `639df77d` Android Keyboard: Keys down to the bar removes the gap under the bottom row.
 
+### Key click volume
+
+- **Switch:** Settings › Keyboard › Key click volume (off: the phone's own level, as before). On, a Volume slider
+  under it (5–100%, 50% to start) sets the level; while it is dragged a click repeats at a steady pace at the level shown.
+- **What:** the key click plays quieter than Android's own key sound.
+- **Why:** upstream plays the system's click at the level the phone chooses for it, and on a Galaxy that's louder
+  than other keyboards' clicks. Gboard has its own Volume on keypress.
+- **How:** `KeyCap` plays `AudioManager.playSoundEffect(sound, volume)` with the slider's scalar (`clickScalar`:
+  100% is full level, every 10% below is 3 dB less) instead of the level-less call. That call doesn't check Touch
+  sounds, so `click` reads the setting itself first. The System volume still scales it.
+- **Commit:** Android Keyboard: Key click volume.
+
 ## Delete
 
 ### Delete words when held

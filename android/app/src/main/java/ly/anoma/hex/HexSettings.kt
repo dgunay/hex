@@ -10,6 +10,7 @@ import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
 import androidx.activity.compose.BackHandler
+import android.media.AudioManager
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.selection.toggleable
@@ -49,6 +50,8 @@ import ly.anoma.hex.keyboard.ClipboardHistory
 import ly.anoma.hex.keyboard.hexClip
 import ly.anoma.hex.keyboard.VoiceOnly
 import ly.anoma.hex.keyboard.KeyboardHeight
+import ly.anoma.hex.keyboard.click
+import ly.anoma.hex.keyboard.clickScalar
 import ly.anoma.hex.speech.*
 import ly.anoma.hex.typing.AdaptiveTouchModel
 import ly.anoma.hex.typing.AdaptiveTouchStore
@@ -145,6 +148,11 @@ internal fun HexSettings(setup: Setup, speech: SpeechPreferences, typing: Typing
     val languageList = automaticChoices.joinToString(stringResource(R.string.language_list_separator)) { it.label }
     val selectedLayout = remember(revision) { typing.layout }
     val height = remember(revision) { typing.height }
+    val clickVolumeOn = remember(revision) { typing.clickVolumeOn }
+    val clickLevel = remember(revision) { typing.clickLevel }
+    // While a volume slider is dragged, its sound repeats at a steady pace at the level shown, until it is let go.
+    val clickAudition = remember { Audition(260) { click(context, AudioManager.FX_KEYPRESS_STANDARD, clickScalar(typing.clickLevel)); 0L } }
+    DisposableEffect(Unit) { onDispose { clickAudition.stop() } }
     val style = remember(revision) { speech.style }
     val translate = remember(revision) { speech.translation }
     val translatable = remember(revision, LocalConfiguration.current) { speech.translatable }
@@ -426,6 +434,14 @@ internal fun HexSettings(setup: Setup, speech: SpeechPreferences, typing: Typing
                                 { context.startActivity(Intent(Settings.ACTION_USER_DICTIONARY_SETTINGS)) })
                             Rule(); Toggle(stringResource(R.string.settings_popups), stringResource(R.string.settings_popups_detail), popups) { typing.popups = it }
                             Rule(); Toggle(stringResource(R.string.settings_haptics), stringResource(R.string.settings_haptics_detail), haptics) { typing.haptics = it }
+                            // Off, the click plays at the phone's own level, as before; on, the slider sets it, playing a click as it moves.
+                            Rule(); Toggle(stringResource(R.string.settings_key_click_volume), stringResource(R.string.key_click_volume_detail), clickVolumeOn) {
+                                typing.clickVolumeOn = it
+                                if (it) click(context, AudioManager.FX_KEYPRESS_STANDARD, clickScalar(typing.clickLevel))
+                            }
+                            if (clickVolumeOn) SettingSlider(stringResource(R.string.key_click_level), clickLevel,
+                                TypingPreferences.CLICK_LEVEL_RANGE, step = 5, indented = true, last = true, finished = clickAudition::stop,
+                                change = { typing.clickLevel = it; clickAudition.start() })
                             Rule(); Toggle(stringResource(R.string.hold_delete_words), stringResource(R.string.hold_delete_words_detail), holdDeleteWords) { typing.holdDeleteWords = it }
                             if (holdDeleteWords) {
                                 // Its own settings, indented under it with no rule between, so they read as part of it.
@@ -827,7 +843,8 @@ private fun reflow(lines: List<String>) = buildString {
  * as it moves. Hex's own colours, Material's slider for touch and TalkBack. [indented] sets it under the switch above
  * it as one of that switch's own settings (no rule between them); [last] gives the group its bottom space back. */
 @Composable internal fun SettingSlider(title: String, value: Int, range: IntRange, step: Int = 10, indented: Boolean = false,
-                                       last: Boolean = false, label: (Int) -> String = { "$it%" }, change: (Int) -> Unit) {
+                                       last: Boolean = false, label: (Int) -> String = { "$it%" }, finished: (() -> Unit)? = null,
+                                       change: (Int) -> Unit) {
     var shown by remember(value) { mutableIntStateOf(value) }
     Column(Modifier.fillMaxWidth().padding(start = if (indented) 40.dp else 16.dp, end = 16.dp,
         top = if (indented) 0.dp else 10.dp, bottom = if (indented && last) 10.dp else 4.dp)) {
@@ -837,7 +854,7 @@ private fun reflow(lines: List<String>) = buildString {
         }
         androidx.compose.material3.Slider(value = shown.toFloat(), valueRange = range.first.toFloat()..range.last.toFloat(),
             steps = (range.last - range.first) / step - 1,
-            onValueChange = { shown = it.roundToInt(); change(shown) },
+            onValueChange = { shown = it.roundToInt(); change(shown) }, onValueChangeFinished = finished,
             colors = androidx.compose.material3.SliderDefaults.colors(thumbColor = colorResource(R.color.ink),
                 activeTrackColor = colorResource(R.color.ink), inactiveTrackColor = colorResource(R.color.modifier),
                 activeTickColor = colorResource(R.color.modifier), inactiveTickColor = colorResource(R.color.ink)))
@@ -904,4 +921,16 @@ private fun PracticeCard(practice: String, mod: Modifier = Modifier, change: (St
                 muted = true, size = 13, mod = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp))
         }
     }
+}
+
+/** A sound played over and over while a slider is dragged: [play] (which returns its length in ms) once at [start],
+ * then again [gap] ms after each one ends, until [stop]. Moving the slider again doesn't restart it. */
+internal class Audition(private val gap: Long, private val play: () -> Long) {
+    private val main = android.os.Handler(android.os.Looper.getMainLooper())
+    private var running = false
+    private val next = object : Runnable {
+        override fun run() { if (running) main.postDelayed(this, play() + gap) }
+    }
+    fun start() { if (!running) { running = true; next.run() } }
+    fun stop() { running = false; main.removeCallbacks(next) }
 }

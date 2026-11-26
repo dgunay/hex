@@ -147,6 +147,16 @@ internal class TypingPreferences(context: Context) {
     var voiceBarFromMenu: Boolean
         get() = prefs.getBoolean(VOICE_BAR_FROM_MENU, false)
         set(value) { prefs.edit().putBoolean(VOICE_BAR_FROM_MENU, value).apply() }
+    /** Settings › Keyboard › Key click volume: off (the phone's own level) by default; on, [clickLevel] sets it. */
+    var clickVolumeOn: Boolean
+        get() = prefs.getBoolean(CLICK_VOLUME, false)
+        set(value) { prefs.edit().putBoolean(CLICK_VOLUME, value).apply() }
+    /** Key click volume's slider, in percent ([CLICK_LEVEL_RANGE]); kept while the switch is off. */
+    var clickLevel: Int
+        get() = prefs.getInt(CLICK_LEVEL, CLICK_LEVEL_DEFAULT).coerceIn(CLICK_LEVEL_RANGE)
+        set(value) { prefs.edit().putInt(CLICK_LEVEL, value.coerceIn(CLICK_LEVEL_RANGE)).apply() }
+    /** The key click's raw volume, null for the phone's own level. */
+    val clickVolume: Float? get() = if (clickVolumeOn) ly.anoma.hex.keyboard.clickScalar(clickLevel) else null
     /** Settings › Keyboard › Height: Normal until another step is chosen. */
     var height: KeyboardHeight
         get() = KeyboardHeight.of(prefs.getString(HEIGHT, null))
@@ -210,6 +220,10 @@ internal class TypingPreferences(context: Context) {
         const val VOICE_ONLY = "voiceOnly"
         const val VOICE_BAR_FROM_MENU = "voiceBarFromMenu"
         const val HEIGHT = "keyboardHeight"
+        const val CLICK_VOLUME = "keyClickVolumeOn"
+        const val CLICK_LEVEL = "keyClickLevel"
+        const val CLICK_LEVEL_DEFAULT = 50
+        val CLICK_LEVEL_RANGE = 5..100
         const val HEX_KEY_LEFT = "hexKeyLeft"
         const val VOLUME_IN_MENU = "volumeInMenu"
         const val KEY_COLORS = "keyColors"
