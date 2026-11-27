@@ -122,8 +122,44 @@ class HexKeyboard : InputMethodService() {
     private val dictionaryChanged = object : ContentObserver(Handler(Looper.getMainLooper())) {
         override fun onChange(selfChange: Boolean) = engine.personalWordsChanged()
     }
+    // The engine types into the app's field, or into Mark a problem's note while it's open.
+    private val routed = RoutedTarget(InputConnectionTarget(this))
+    private var note: NoteText? = null
+    /** The app's field as the engine left it for the note, to start in again after. */
+    private var noteReturn: EditorInfo? = null
+
+    /** Typing log › Mark a problem: after the mark, a box of the keyboard's own asks what went wrong. The keyboard types
+     * into it as into a field (autocorrect, the strip, delete), and the app's field waits untouched. */
+    private fun startNote() {
+        val info = currentInputEditorInfo ?: return
+        if (view == null || note != null) return
+        val (start, end) = engine.selection
+        noteReturn = EditorInfo().also { copy ->
+            copy.inputType = info.inputType; copy.imeOptions = info.imeOptions; copy.packageName = info.packageName
+            copy.actionLabel = info.actionLabel; copy.actionId = info.actionId; copy.fieldId = info.fieldId
+            copy.extras = info.extras; copy.hintText = info.hintText
+            copy.initialSelStart = start; copy.initialSelEnd = end
+        }
+        val text = NoteText().also { note = it }
+        routed.note = NoteTarget(text, changed = { a, b, c, d ->
+            if (note === text) { engine.updateSelection(a, b, c, d); view?.noteChanged() }
+        }, done = { endNote(keep = true) })
+        view?.note(text)
+        engine.startInput(NoteTarget.editorInfo()); engine.configureTyping()
+    }
+    /** The note's ✓ or Return keeps it in the log after the mark; its ✕, or leaving the field, drops it. */
+    internal fun endNote(keep: Boolean) {
+        val text = note ?: return
+        note = null; routed.note = null
+        view?.note(null)
+        val said = text.text.toString().trim()
+        if (keep && said.isNotEmpty()) TypingLog.write("★ NOTE " + TypingLog.q(said))
+        noteReturn?.let { engine.startInput(it); engine.configureTyping() }
+        noteReturn = null
+    }
+
     internal val engine by lazy {
-        KeyboardEngine(InputConnectionTarget(this), feedback, { layoutLanguage }, { typingLanguage },
+        KeyboardEngine(routed, feedback, { layoutLanguage }, { typingLanguage },
             // Labs › Keyboard › Neural autocorrect reads English alone.
             { SpatialDecoder(TypingModel.asset(assets, it)).also { d -> if (d.model.language == "en") d.neural = NeuralAutocorrect } },
             readPersonal = { PersonalWords.read(contentResolver, it, if (feedback.importedWords) ImportedWords.read(this) else emptyList()) },
@@ -131,7 +167,7 @@ class HexKeyboard : InputMethodService() {
             emoji = EmojiWords(assets, words),
             learned = { if (preferences.learnFixes) fixes.record(it) },
             adaptiveTouch = { if (feedback.adaptiveTouch) AdaptiveTouchStore.get(this) else null },
-            swipeUnavailable = ::swipeUnavailable, learnWord = ::learnWord)
+            swipeUnavailable = ::swipeUnavailable, learnWord = ::learnWord).also { it.afterMark = ::startNote }
     }
     /** Labs › Keyboard › Typing log turned on or off; on, the log starts with the settings typing reads. */
     private fun typingLogChanged() {
@@ -337,6 +373,8 @@ class HexKeyboard : InputMethodService() {
         // WebViews and Compose restart one view to move between their inputs, which Hex can't tell from the same field.
         field.started(attribute.packageName)
         capture.leave()
+        // Another field: a note still open goes, unkept.
+        if (note != null) { note = null; routed.note = null; noteReturn = null; view?.note(null) }
         engine.startInput(attribute)
         inField = true
     }
@@ -380,7 +418,8 @@ class HexKeyboard : InputMethodService() {
     override fun onUpdateSelection(oldSelStart: Int, oldSelEnd: Int, newSelStart: Int, newSelEnd: Int,
                                    candidatesStart: Int, candidatesEnd: Int) {
         super.onUpdateSelection(oldSelStart, oldSelEnd, newSelStart, newSelEnd, candidatesStart, candidatesEnd)
-        engine.updateSelection(oldSelStart, oldSelEnd, newSelStart, newSelEnd)
+        // While the note is open the engine follows the note's cursor, not the app's.
+        if (note == null) engine.updateSelection(oldSelStart, oldSelEnd, newSelStart, newSelEnd)
     }
 
     // Android 11's inline autofill suggestions (Labs › Keyboard › Password manager suggestions): the

@@ -93,13 +93,6 @@ internal class StripView(context: Context, private val ime: HexKeyboard, private
     // Labs › Keyboard › Emoji search: back to the panel, what was typed, and the emoji found, scrolling, in the slots' place.
     private val searchRow = LinearLayout(context)
     private val searchQuery = TextView(context)
-    // The line's back: to the emoji panel from a search; from Mark a problem's note, it keeps the note.
-    private val searchBack by lazy {
-        toolButton(R.drawable.ic_back, R.string.keyboard_emoji_search_back) {
-            val note = ime.engine.notingProblem
-            ime.engine.endEmojiSearch(); if (!note) host.openEmoji()
-        }
-    }
     private var searchShown: String? = null
     private val noticeRow = LinearLayout(context)
     private val noticeText = TextView(context)
@@ -167,7 +160,8 @@ internal class StripView(context: Context, private val ime: HexKeyboard, private
         noticeRow.visibility = GONE
         idleRow.addView(noticeRow, LinearLayout.LayoutParams(0, -1, 1f))
         searchRow.orientation = LinearLayout.HORIZONTAL; searchRow.gravity = Gravity.CENTER_VERTICAL
-        searchRow.addView(searchBack, LinearLayout.LayoutParams(dp(40), -1))
+        searchRow.addView(toolButton(R.drawable.ic_back, R.string.keyboard_emoji_search_back) { ime.engine.endEmojiSearch(); host.openEmoji() },
+            LinearLayout.LayoutParams(dp(40), -1))
         searchQuery.apply {
             useInter(500); setTextSize(TypedValue.COMPLEX_UNIT_DIP, 15f); maxLines = 1; ellipsize = TextUtils.TruncateAt.START
             gravity = Gravity.CENTER_VERTICAL; setPadding(dp(4), 0, dp(10), 0)
@@ -407,11 +401,10 @@ internal class StripView(context: Context, private val ime: HexKeyboard, private
     }
     /** Labs › Keyboard › Emoji search: the search line with [query] (the emoji found show in the grid under it), or none
      * for a null [query]. */
-    fun emojiSearch(query: String?, note: Boolean = false) {
+    fun emojiSearch(query: String?) {
         searchShown = query
         if (query != null) {
-            searchBack.contentDescription = context.getString(if (note) R.string.keyboard_note_done else R.string.keyboard_emoji_search_back)
-            searchQuery.text = query.ifEmpty { context.getString(if (note) R.string.keyboard_note_hint else R.string.keyboard_emoji_search) }
+            searchQuery.text = query.ifEmpty { context.getString(R.string.keyboard_emoji_search) }
             searchQuery.setTextColor(if (query.isEmpty()) quiet else ink)
         }
         update()
