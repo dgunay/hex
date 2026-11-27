@@ -166,15 +166,15 @@ internal class TypingWord(val decoder: SpatialDecoder, val spatial: Boolean) {
                 val index = model.context(previous)
                 // Labs › Keyboard › Neural autocorrect: once the model has read them, the words likeliest after the
                 // whole sentence go first ("pick up my": "kids", where the pairs read only "my").
-                rankedNext?.takeIf { it.first == text }?.second ?: nextPool(previous, index, 3)
+                rankedNext?.takeIf { it.first == text }?.second ?: nextPool(previous, index, NEXT_WORDS)
             }
         }.orEmpty()
         val upper = addsCapitals && (capitalize ?: startsSentence(text))
-        val out = ArrayList<String>(3)
+        val out = ArrayList<String>(NEXT_WORDS)
         for (w in words) {
             val shown = if (upper) w.replaceFirstChar { it.uppercase() } else if (addsCapitals) displayed(w) else w.lowercase()
             if (out.none { it.equals(shown, ignoreCase = true) }) out.add(shown)
-            if (out.size == 3) break
+            if (out.size == NEXT_WORDS) break
         }
         return out
     }
@@ -663,6 +663,12 @@ internal class TypingWord(val decoder: SpatialDecoder, val spatial: Boolean) {
         const val NEURAL_COMPLETIONS = 24
         /** Words a revisited word offers beside what autocorrect replaced (Keyboard › Fix earlier words). */
         const val REVISIT_WORDS = 3
+        /** Next words [predictions] offers after a space: three for the strip's slots, and with Labs › Keyboard › More
+         * suggestions the rest a scroll away, as completions are. */
+        const val NEXT_WORDS = 8
+        /** Words the strip offers for an earlier word with Labs › Keyboard › More suggestions: three in its slots, the
+         * rest a scroll away. */
+        const val REVISIT_SHOWN = 8
         /** How much less likely than the word as it stands, in nats, an offer for a revisited word may be. */
         const val REVISIT_MARGIN = 10.0
         /** Labs › Keyboard › Neural autocorrect reads this many of a revisited word's readings, within this margin. */

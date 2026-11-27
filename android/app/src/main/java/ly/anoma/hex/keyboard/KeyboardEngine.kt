@@ -545,7 +545,10 @@ internal class KeyboardEngine(
             !KeyboardTools.showsInEmptyField(feedback.keyboardTools, before) { target.after(1) }
         // Next words go through the steady strip keyed apart from any typed word ("\u0000"), so a word shown keeps its
         // slot when the model's order comes; anything else starts afresh.
-        if (shows) showWord("\u0000" + before, w!!.predictions(before!!, capitalize = capsWanted()).map { shown(Suggestion(it, Suggestion.Kind.Next)) }, null)
+        // Labs › Keyboard › More suggestions: the next words past the three slots, a scroll away, as for a word typed.
+        val count = if (feedback.moreSuggestions) TypingWord.NEXT_WORDS else Suggestion.SLOTS
+        if (shows) showWord("\u0000" + before, w!!.predictions(before!!, capitalize = capsWanted()).take(count)
+            .map { shown(Suggestion(it, Suggestion.Kind.Next)) }, null)
         else showStrip(emptyList())
         // Labs › Keyboard › Neural autocorrect: the model's order, once it has read the sentence, if nothing was typed since.
         if (shows) w!!.rankPredictions(before!!, { main.post(it) }) {
@@ -1351,7 +1354,9 @@ internal class KeyboardEngine(
         val typed = fixes.lastOrNull { it.language == language && it.replacement == at.text }?.original
         val pool = reader.revisitPool(at.text, at.before, at.next, grid).filterNot { !it.stands && it.text.equals(typed, ignoreCase = true) }
         fun slots(words: List<String>) = (listOfNotNull(typed?.let { Suggestion(it, Suggestion.Kind.Typed) }) +
-            words.take(TypingWord.REVISIT_WORDS).map { Suggestion(it, Suggestion.Kind.Word) }).take(Suggestion.SLOTS)
+            words.take(TypingWord.REVISIT_SHOWN).map { Suggestion(it, Suggestion.Kind.Word) })
+            // Labs › Keyboard › More suggestions: the rest past the three slots, a scroll away.
+            .take(if (feedback.moreSuggestions) TypingWord.REVISIT_SHOWN else Suggestion.SLOTS)
         val first = slots(pool.filter { it.offered && !it.stands }.map { it.text })
         // Labs › Keyboard › Neural autocorrect: the model reads each word in its sentence, the words after it as well as
         // before, and its order replaces the word pairs' once it answers. Its likeliest may be one the pairs left out.

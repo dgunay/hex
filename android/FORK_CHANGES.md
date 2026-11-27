@@ -42,7 +42,8 @@ Each setting's commits still use the names it had when it was added. Commit hash
 
 - **What:** while a word is typed, a word already shown in the strip keeps its slot when a later strip for the same
   word comes (the fix after the pause, Neural autocorrect's ranked completions). With Labs › Keyboard › More
-  suggestions on (off by default), the strip scrolls right to 8 more words past its three slots.
+  suggestions on (off by default), the strip scrolls right to 8 more words past its three slots, for a word being
+  typed, for the next word after a space (8 in all) and for an earlier word (8 in all).
 - **Why:** the strips arriving one after another moved the word about to be tapped ("gonna" jumped as "gone" came in),
   and the three slots hid likely words.
 - **How:** `Suggestion.place(slots, previous)` keeps a shown word's slot while the word typed so far goes on; only
@@ -117,6 +118,24 @@ Each setting's commits still use the names it had when it was added. Commit hash
   - At a word, a tap no longer turns shift on for the next letter (hold shift for a capital mid-word: "iP"), and two
     quick taps there recase twice rather than lock caps. Caps lock still goes off with a tap.
   - The cursor must end the word: inside a word, or after its space, shift is as before.
+
+### Picks and spaces in the middle of text
+
+- **What:** fixes from a day's typing log, all where text follows the cursor.
+  - A next word picked right after a pick that held its space (the cursor before an existing space, as in "up to‸
+    best") goes in with a space before it. The tap used to do nothing.
+  - Space there keeps the held space for the next word, as a space after a pick is swallowed ("up to", space, "be"
+    is "up to be", not "up tobe"); a second space goes in.
+  - A pick with a letter right after the cursor (Gmail's Smart Compose shows its suggestion as text there) puts the
+    word in with its space before that text. The tap used to do nothing.
+  - A closing double quote takes the space before it, whether a pick, an autocorrection or you typed it, when a quote
+    is open in the paragraph (`"hello there "` then `"` is `"hello there"`). An opening quote keeps its space.
+- **Why:** reported: strip taps that stopped registering, and deleting a space before a closing quote by hand.
+- **How:** `KeyboardEngine.pickSuggestion` takes the held space first (`takeHeldSpace`), and no longer returns when
+  `canEndWord` is false; `space` swallows once at `heldAnchor` (`heldSpaced`); `type` lets
+  `SpaceRules.closesQuote` (an odd count of `"` or more `“` than `”` in the paragraph) take the space.
+- **Limits:** typing letters straight against the next word ("shapin‸the") still makes one word of them, which the
+  strip may then correct as a whole.
 
 ## Delete
 

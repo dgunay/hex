@@ -66,7 +66,7 @@ class NeverSuggestTest {
 
     @Test fun nextWordRowsSkipBlockedTargetsAndBackfill() {
         val nb = word("nb")
-        assertEquals(3, nb.predictions("fy ").size)
+        assertTrue(nb.predictions("fy ").size >= 3)
         assertFalse("faen" in nb.predictions("fy "))
         nb.suggestSwearWords = true
         assertEquals("faen", nb.predictions("fy ").first())
@@ -74,7 +74,7 @@ class NeverSuggestTest {
         for (on in listOf(false, true)) {
             en.suggestSwearWords = on
             val predictions = en.predictions("mentally ")
-            assertEquals(3, predictions.size)
+            assertTrue(predictions.size >= 3)
             assertTrue("ill" in predictions)
             assertFalse("retarded" in predictions)
         }
@@ -391,20 +391,20 @@ class NeverSuggestTest {
     // testNextWordPredictionsUseTheActiveLanguageAndRespectBoundaries.
     @Test fun sentenceStartersAndNextWordsFillAllThreeSlots() {
         val w = word()
-        for (context in listOf("Done. ", "Really? ", "Wow! ", "Hi\n", "")) assertEquals(context, listOf("I", "The", "I'm"), w.predictions(context))
-        assertEquals(listOf("I", "the", "I'm"), w.predictions("Done. ", capitalize = false))
-        assertEquals("an unknown word: the commonest words", listOf("the", "to", "and"), w.predictions("zzqx "))
-        assertEquals("after a comma, words that start a clause", listOf("I", "but", "and"), w.predictions("Running late, "))
+        for (context in listOf("Done. ", "Really? ", "Wow! ", "Hi\n", "")) assertEquals(context, listOf("I", "The", "I'm"), w.predictions(context).take(3))
+        assertEquals(listOf("I", "the", "I'm"), w.predictions("Done. ", capitalize = false).take(3))
+        assertEquals("an unknown word: the commonest words", listOf("the", "to", "and"), w.predictions("zzqx ").take(3))
+        assertEquals("after a comma, words that start a clause", listOf("I", "but", "and"), w.predictions("Running late, ").take(3))
         assertEquals("not after a number", emptyList<String>(), w.predictions("at 7 "))
         assertEquals("no space after the period yet", emptyList<String>(), w.predictions("Done."))
         val hi = w.predictions("say hi ")
-        assertEquals(3, hi.size)
+        assertTrue(hi.size >= 3)
         assertTrue(hi.toString(), hi.all { it.first().isLowerCase() || it == "I" || it.startsWith("I'") })
         val es = word("es")
-        assertEquals(3, es.predictions("por ").size)
+        assertTrue(es.predictions("por ").size >= 3)
         for (context in listOf("@por ", "todo/por ", "por  ")) assertEquals(context, emptyList<String>(), es.predictions(context))
-        for (context in listOf("por. ", "hola\n")) assertEquals(context, listOf("Yo", "El", "La"), es.predictions(context))
-        assertEquals(listOf("yo", "el", "la"), es.predictions("por. ", capitalize = false))
+        for (context in listOf("por. ", "hola\n")) assertEquals(context, listOf("Yo", "El", "La"), es.predictions(context).take(3))
+        assertEquals(listOf("yo", "el", "la"), es.predictions("por. ", capitalize = false).take(3))
     }
 
     // iOS testShortCompletionsFollowThePhraseAndKeepTheTypedCase, testTheStripNeverRepeatsWhatYouTyped
@@ -605,7 +605,7 @@ class NeverSuggestTest {
         }
         assertEquals("I think I'd help ", on.typed(g, "i think id help "))
         assertEquals("i think i'd help ", off.typed(g, "i think id help "))
-        assertEquals(listOf("I", "The", "I'm"), on.predictions(""))
+        assertEquals(listOf("I", "The", "I'm"), on.predictions("").take(3))
         assertTrue(off.predictions("").toString(), off.predictions("").none { it != it.lowercase() })
         off.reset(""); for (c in "mon") off.tap(g, c)
         assertTrue(off.strip().toString(), off.strip().none { it.text != it.text.lowercase() })
@@ -626,10 +626,10 @@ class NeverSuggestTest {
     @Test fun everyLanguageOffersWordsBetweenWords() {
         for (lang in listOf("en", "es", "de", "nb", "fr", "it", "pt")) {
             val w = word(lang)
-            for (before in listOf("", "zzqx, ", "zzqx ")) assertEquals("$lang [$before]", 3, w.predictions(before).size)
+            for (before in listOf("", "zzqx, ", "zzqx ")) assertTrue("$lang [$before]", w.predictions(before).size >= 3)
         }
-        assertEquals(listOf("Je", "Le", "La"), word("fr").predictions(""))
-        assertEquals(listOf("e", "ma", "che"), word("it").predictions("ciao, "))
+        assertEquals(listOf("Je", "Le", "La"), word("fr").predictions("").take(3))
+        assertEquals(listOf("e", "ma", "che"), word("it").predictions("ciao, ").take(3))
     }
 
     // Keyboard › Swipe typing's decoder (SwipeDecoder, iPhone Hex's port) on the bundled models, with straight strokes
