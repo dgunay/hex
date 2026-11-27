@@ -149,8 +149,10 @@ internal class NoteRow(context: Context, private val discard: () -> Unit, privat
 
     private fun draw() {
         val note = shown ?: return
-        val caret = SpannableStringBuilder("│").apply {
-            setSpan(ForegroundColorSpan(if (caretOn) ink else 0), 0, 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        // The cursor is a thin bar drawn in place of one character: a "│" glyph would add its side bearings, a gap
+        // on each side.
+        val caret = SpannableStringBuilder("\u2060").apply {
+            setSpan(CaretSpan(if (caretOn) ink else 0, maxOf(2, dp(1) * 3 / 2)), 0, 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         }
         line.contentDescription = note.text.ifEmpty { context.getString(R.string.keyboard_note_hint) }
         line.text = if (note.text.isEmpty()) SpannableStringBuilder(caret).append(context.getString(R.string.keyboard_note_hint)).apply {
@@ -158,6 +160,19 @@ internal class NoteRow(context: Context, private val discard: () -> Unit, privat
         } else SpannableStringBuilder(note.text, 0, note.end).append(caret).append(note.text, note.end, note.text.length).apply {
             setSpan(ForegroundColorSpan(ink), 0, note.end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
             setSpan(ForegroundColorSpan(ink), note.end + 1, length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        }
+    }
+
+    /** A text cursor: [width] px wide, the line's ascent to descent, in [color]. */
+    private class CaretSpan(private val color: Int, private val width: Int) : android.text.style.ReplacementSpan() {
+        override fun getSize(paint: android.graphics.Paint, text: CharSequence?, start: Int, end: Int,
+                             fm: android.graphics.Paint.FontMetricsInt?) = width
+        override fun draw(canvas: android.graphics.Canvas, text: CharSequence?, start: Int, end: Int, x: Float, top: Int,
+                          y: Int, bottom: Int, paint: android.graphics.Paint) {
+            if (color == 0) return
+            val was = paint.color; paint.color = color
+            canvas.drawRect(x, y + paint.ascent(), x + width, y + paint.descent(), paint)
+            paint.color = was
         }
     }
 
