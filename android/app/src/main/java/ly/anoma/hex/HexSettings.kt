@@ -239,6 +239,7 @@ internal fun HexSettings(setup: Setup, speech: SpeechPreferences, typing: Typing
     val strongAutocorrect = remember(revision) { typing.strongAutocorrect }
     val letterSymbols = remember(revision) { typing.letterSymbols }
     val swiftKeyLayout = remember(revision) { typing.swiftKeyLayout }
+    val shiftRecases = remember(revision) { typing.shiftRecases }
     val holdDelay = remember(revision) { typing.holdDelay }
     val numberRow = remember(revision) { typing.numberRow }
     val snugBottom = remember(revision) { typing.snugBottom }
@@ -655,6 +656,9 @@ internal fun HexSettings(setup: Setup, speech: SpeechPreferences, typing: Typing
                                 Rule()
                                 Toggle(stringResource(R.string.swiftkey_layout), stringResource(R.string.swiftkey_layout_detail),
                                     swiftKeyLayout, noteLines = Int.MAX_VALUE) { typing.swiftKeyLayout = it }
+                                Rule()
+                                Toggle(stringResource(R.string.shift_recases), stringResource(R.string.shift_recases_detail),
+                                    shiftRecases, noteLines = Int.MAX_VALUE) { typing.shiftRecases = it }
                                 Rule()
                                 Toggle(stringResource(R.string.number_row), stringResource(R.string.number_row_detail),
                                     numberRow) { typing.numberRow = it }

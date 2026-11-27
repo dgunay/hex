@@ -319,17 +319,47 @@ internal class KeyboardEngine(
         lastEmojiAvailable = emoji
         if (changed && feedback.keyboardTools) surface?.toolsChanged()
     }
-    /** Shift went down: it acts at once, so a held shift and a letter type a capital. */
+    /** Shift went down: it acts at once, so a held shift and a letter type a capital. With Labs › Keyboard › Shift
+     * changes a word's case on and the cursor at the end of a word, it only holds for a chord; a tap recases the word
+     * as it lifts. Caps lock goes off as ever. */
     fun shiftDown() {
         if (symbols) return
-        shift.down(clock()); showPlane()
+        recasing = feedback.shiftRecases && !shift.locked && recasable() != null
+        if (recasing) shift.hold() else shift.down(clock())
+        showPlane()
     }
     /** Shift lifted; on the symbol pages its key switches between them, on lifting. */
     fun shiftUp() {
         if (symbols) { more = !more; showPlane(); return }
         val was = shift.uppercase
-        shift.up()
+        val chord = shift.up()
+        if (recasing) { recasing = false; if (!chord) recase() }
         if (was != shift.uppercase) showPlane()
+    }
+    private var recasing = false
+    /** The word the cursor ends: the one being typed, else one in the field with nothing selected and no letter after
+     * the cursor. Null in a password field. */
+    private fun recasable(): String? {
+        if (secure || !target.connected || selStart != selEnd || target.selected()?.isNotEmpty() == true) return null
+        if (target.after(1)?.firstOrNull()?.isLetter() == true) return null
+        val token = word?.token.orEmpty()
+        if (token.isNotEmpty() && endsWith(prefix + token)) return token
+        return WordCase.ending(before())
+    }
+    /** Shift tapped at a word: it goes to its next case, and stays as you cased it (space corrects it no more). */
+    private fun recase() {
+        val old = recasable() ?: return
+        val new = WordCase.next(old)
+        logAfter { "recase ${TypingLog.q(old)} → ${TypingLog.q(new)}" }
+        if (new == old) return
+        edited(); undo = null; clearSpaces()
+        val w = word
+        val typing = w != null && w.token == old && endsWith(prefix + old)
+        // The same length, so the cursor stays where it was.
+        if (!replace(old, new) || w == null) return
+        if (typing) w.recase(new)
+        else { prefix = before().dropLast(new.length).takeLast(40); w.restored(new, prefix) }
+        showSuggestions(w)
     }
     /** ?123 and ABC. A word being typed goes along, as on Gboard and iPhone Hex: its strip stays, a mark on the
      * symbol page ends it as on the letters ("teh" ?123 "?" is "the?"), and back on the letters it goes on. */

@@ -26,10 +26,17 @@ internal class ShiftState {
         }
     }
 
-    /** A chord (a letter typed while held) neither stays on nor counts towards a double tap. */
-    fun up() {
+    /** Labs › Keyboard › Shift changes a word's case, at a word: shift held for a chord's capitals only, its mode and
+     * the double tap left alone, since a tap recases the word instead. */
+    fun hold() { held = true; typedWhileHeld = false; lastTapDown = -1 }
+
+    /** A chord (a letter typed while held) neither stays on nor counts towards a double tap. Returns whether it was
+     * one. */
+    fun up(): Boolean {
         held = false
+        val chord = typedWhileHeld
         if (typedWhileHeld) { typedWhileHeld = false; lastTapDown = -1; if (mode != Mode.Locked) mode = Mode.Off }
+        return chord
     }
 
     /** A character went in. */

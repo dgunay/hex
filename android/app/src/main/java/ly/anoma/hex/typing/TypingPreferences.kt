@@ -44,6 +44,10 @@ internal class TypingPreferences(context: Context) {
         set(value) { prefs.edit().putBoolean("letterSymbols", value).apply() }
     /** Labs › Keyboard › SwiftKey layout: Microsoft SwiftKey's symbols on the letters, its bottom row (emoji before
      * the comma) and its held period. Off by default. */
+    /** Labs › Keyboard › Shift changes a word's case ([ly.anoma.hex.keyboard.WordCase]). */
+    var shiftRecases: Boolean
+        get() = prefs.getBoolean(SHIFT_RECASES, false)
+        set(value) { prefs.edit().putBoolean(SHIFT_RECASES, value).apply() }
     var swiftKeyLayout: Boolean
         get() = prefs.getBoolean(SWIFTKEY_LAYOUT, false)
         set(value) { prefs.edit().putBoolean(SWIFTKEY_LAYOUT, value).apply() }
@@ -241,6 +245,7 @@ internal class TypingPreferences(context: Context) {
         const val EMOJI_SEARCH = "emojiSearch"
         const val TYPING_LOG = "typingLog"
         const val SWIFTKEY_LAYOUT = "swiftKeyLayout"
+        const val SHIFT_RECASES = "shiftRecases"
         const val KEYBOARD_TOOLS = "keyboardTools"
         const val SMART_QUOTES = "smartQuotes"
         const val SWIPE_DELETE_LETTERS = "swipeDeleteLetters"

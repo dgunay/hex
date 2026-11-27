@@ -211,6 +211,8 @@
     <string name="hold_delay">Hold delay</string>
     <string name="swiftkey_layout">SwiftKey layout</string>
     <string name="swiftkey_layout_detail">Microsoft SwiftKey’s symbols when you hold a letter, its bottom row with emoji before the comma, and its period popup</string>
+    <string name="shift_recases">Shift changes a word’s case</string>
+    <string name="shift_recases_detail">Tap shift with the cursor at the end of a word to make it Title, then ALL CAPS, then lowercase, as on Microsoft SwiftKey. Hold shift and type for a capital as usual</string>
     <string name="letter_symbols">Symbols on letter keys</string>
     <string name="letter_symbols_detail">Hold a letter to type a symbol, like m for ?</string>
     <string name="number_row">Number row</string>
