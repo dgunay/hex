@@ -42,12 +42,20 @@ internal object NeuralAutocorrect : SpatialDecoder.NeuralScorer {
     }
 
     /** The switch, read again whenever it changes; off frees the model. */
-    @Synchronized fun configure(context: Context, on: Boolean, budget: Int) {
+    @Synchronized fun configure(context: Context, on: Boolean, budget: Int, model: String = "") {
         app = context.applicationContext
         budgetMs = budget.toLong()
         enabled = on
-        if (!on) worker.execute(::unload)
+        // Another model chosen: the one loaded goes, and the next word loads the new one.
+        val changed = model != modelName
+        modelName = model
+        if (!on || changed) worker.execute(::unload)
     }
+    /** Labs › Keyboard › Neural autocorrect › Model: a copied model's name ([NeuralModels]), or "" for the download. */
+    @Volatile private var modelName = ""
+    /** The model file to load: the chosen copied one, else the download once it's in (checked against its SHA-256). */
+    private fun chosen(context: Context, verify: Boolean) = NeuralModels.file(context, modelName)
+        ?: if (verify) ModelStore.neural.verified(context) else ModelStore.neural.installed(context)
 
     override val active: Boolean
         get() {
@@ -60,14 +68,15 @@ internal object NeuralAutocorrect : SpatialDecoder.NeuralScorer {
     private fun load() {
         val context = app ?: return
         // Not downloaded yet: nothing to load, and nothing queued.
-        if (ModelStore.neural.installed(context) == null || !loading.compareAndSet(false, true)) return
+        if (chosen(context, verify = false) == null || !loading.compareAndSet(false, true)) return
         worker.execute {
             try {
                 if (!enabled || model != null) return@execute
-                val file = ModelStore.neural.verified(context) ?: return@execute
+                val file = chosen(context, verify = true) ?: return@execute
                 val started = SystemClock.elapsedRealtime()
                 model = NeuralModel.open(file.path, THREADS)
                 loadMs = SystemClock.elapsedRealtime() - started
+                TypingLog.event { "neural model ${modelName.ifEmpty { "downloaded" }} loaded in ${loadMs}ms" }
                 lastUse = SystemClock.elapsedRealtime()
                 scheduleIdleCheck()
             } finally { loading.set(false) }
@@ -229,7 +238,7 @@ internal object NeuralAutocorrect : SpatialDecoder.NeuralScorer {
     /** Settings' speed test: [SAMPLES] scored as space scores a word, after the text before it is read as typing reads
      * it. Loads the model first if it isn't. Each sample's wait, in ms, or null without the model. Off the main thread. */
     fun speedTest(context: Context): List<Long>? {
-        val file = ModelStore.neural.verified(context.applicationContext) ?: return null
+        val file = chosen(context.applicationContext, verify = true) ?: return null
         val m = model ?: NeuralModel.open(file.path, THREADS) ?: return null
         val own = m !== model
         try {

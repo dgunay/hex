@@ -322,6 +322,12 @@ These are listed with their features; the bugs aren't in upstream's code.
 
 - **Switch:** Labs › Keyboard › Neural autocorrect (off). On, it offers a one-time 145 MB download. The row then
   shows Ready, a Test speed action, and how long space has waited for the model while you typed.
+- **Model choice:** with GGUF models copied into the app's `no_backup/neural-models/` folder, a Model row offers them
+  in a dropdown beside the downloaded SmolLM2-135M, to try a fine-tune in real typing. Nothing downloads them; on this
+  debug build they're copied with `adb push model.gguf /data/local/tmp/` and
+  `adb shell run-as ly.anoma.hex cp /data/local/tmp/model.gguf no_backup/neural-models/`. A change takes effect at the
+  next word (`NeuralModels`, `TypingPreferences.neuralModel`); the typing log notes which model loaded. Speed test
+  uses the chosen one. Commit: Android Keyboard: Neural autocorrect can use a model copied onto the phone (Labs).
 - **What:** English autocorrect decides with a small language model that reads the text before the word (the
   keyboard's last 96 characters), instead of only the word before it. It picks the reading that fits the sentence,
   and it can tell a real word it has never seen ("tailscale") from a typo, because it scores words piece by piece

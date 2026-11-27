@@ -189,6 +189,8 @@
     <string name="fix_earlier_words">修改之前的词</string>
     <string name="neural_autocorrect">神经网络自动更正</string>
     <string name="neural_autocorrect_detail">借助手机上的小型语言模型，根据前文更正英文单词。需一次性下载 %1$d MB。</string>
+    <string name="neural_model">模型</string>
+    <string name="neural_model_downloaded">已下载的 SmolLM2-135M</string>
     <string name="neural_test">测试速度</string>
     <string name="neural_testing">正在测试速度…</string>
     <string name="neural_test_result">一般单词 %1$d 毫秒 · 最慢 %2$d 毫秒 · 再次测试</string>
