@@ -178,9 +178,13 @@ internal class TypingWord(val decoder: SpatialDecoder, val spatial: Boolean) {
      * rest; nothing after a handle, path, number or a second space, or before a space is typed.
      * `before` is the text before the cursor; a bare word counts as one just finished. Capitalised
      * as shift would be, by default at a sentence's start. */
+    /** Whether [before] ends in a word the strip's next words treat as finished, as if the space after it were typed:
+     * a tap on one of them puts that space in first (`KeyboardEngine.pickSuggestion`). */
+    fun endsInWord(before: String) = before.lastOrNull()?.let { it.isLetter() || it == '\'' || it == '\u2019' } == true
+
     fun predictions(before: String, capitalize: Boolean? = null): List<String> {
         if (standIn) return emptyList()
-        val text = if (before.lastOrNull()?.let { it.isLetter() || it == '\'' || it == '\u2019' } == true) "$before " else before
+        val text = if (endsInWord(before)) "$before " else before
         val words = when {
             startsSentence(text) -> sentenceStarters[model.language]
             !text.last().isWhitespace() -> return emptyList()
@@ -393,7 +397,7 @@ internal class TypingWord(val decoder: SpatialDecoder, val spatial: Boolean) {
     fun rankPredictions(before: String, post: (() -> Unit) -> Unit, answered: () -> Unit) {
         val neural = decoder.neural?.takeIf { it.active } ?: return
         if (standIn || model.language != "en") return
-        val text = if (before.lastOrNull()?.let { it.isLetter() || it == '\'' || it == '\u2019' } == true) "$before " else before
+        val text = if (endsInWord(before)) "$before " else before
         if (startsSentence(text) || !text.last().isWhitespace() || text.dropLast(1).lastOrNull()?.let { it in midSentenceMarks } == true) return
         if (rankedNext?.first == text || askedNext == text) return
         val finished = currentToken(text.dropLast(1)) ?: return

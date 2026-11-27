@@ -122,8 +122,10 @@ Each setting's commits still use the names it had when it was added. Commit hash
 ### Picks and spaces in the middle of text
 
 - **What:** fixes from a day's typing log, all where text follows the cursor.
-  - A next word picked right after a pick that held its space (the cursor before an existing space, as in "up to‸
-    best") goes in with a space before it. The tap used to do nothing.
+  - A next word picked right after a word, with no space before the cursor, goes in with a space before it: after a
+    pick that held its space ("up to‸ best") or a word you came back to ("you'll‸ soon"). The strip offers next words
+    there because it treats the word as finished, and a tap used to do nothing. One rule,
+    `TypingWord.endsInWord`, now decides both.
   - Space there keeps the held space for the next word, as a space after a pick is swallowed ("up to", space, "be"
     is "up to be", not "up tobe"); a second space goes in.
   - A pick with a letter right after the cursor (Gmail's Smart Compose shows its suggestion as text there) puts the
@@ -131,7 +133,8 @@ Each setting's commits still use the names it had when it was added. Commit hash
   - A closing double quote takes the space before it, whether a pick, an autocorrection or you typed it, when a quote
     is open in the paragraph (`"hello there "` then `"` is `"hello there"`). An opening quote keeps its space.
 - **Why:** reported: strip taps that stopped registering, and deleting a space before a closing quote by hand.
-- **How:** `KeyboardEngine.pickSuggestion` takes the held space first (`takeHeldSpace`), and no longer returns when
+- **How:** `KeyboardEngine.pickSuggestion` puts in the space the strip assumed (`putSpace`, which `takeHeldSpace`
+  also uses) where `TypingWord.endsInWord` (what `predictions` uses) says the word is finished, and no longer returns when
   `canEndWord` is false; `space` swallows once at `heldAnchor` (`heldSpaced`); `type` lets
   `SpaceRules.closesQuote` (an odd count of `"` or more `“` than `”` in the paragraph) take the space.
 - **Limits:** typing letters straight against the next word ("shapin‸the") still makes one word of them, which the

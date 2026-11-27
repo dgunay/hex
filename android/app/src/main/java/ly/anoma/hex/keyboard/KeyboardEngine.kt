@@ -597,6 +597,10 @@ internal class KeyboardEngine(
     private fun takeHeldSpace(before: String): String {
         val held = heldAnchor != null && heldAnchor == before
         if (!held && (swipeAnchor == null || swipeAnchor != before)) return before
+        return putSpace(before)
+    }
+    /** A space at the cursor, settling a held one; returns the text before the cursor, unchanged if it didn't go in. */
+    private fun putSpace(before: String): String {
         heldAnchor = null; swipeAnchor = null; heldSpaced = false
         if (!target.commit(" ")) return before
         if (expectedCaret >= 0) expectedCaret++
@@ -627,10 +631,11 @@ internal class KeyboardEngine(
         if ((symbols && w.token.isEmpty()) || secure) return
         val old = w.token
         if (old.isNotEmpty() && !endsWith(prefix + old)) { resetTyping(); surface?.suggestions(emptyList()); return }
-        // A next word picked where a pick held its space: that space goes in first, as it would for a typed letter.
+        // A next word after a word the strip treats as finished (one a pick held its space for, or one you came back
+        // to): the space the strip assumed goes in first, as it would for a typed letter.
         if (old.isEmpty() && !w.startsWord(before())) {
             val b = before()
-            if (heldAnchor == null || heldAnchor != b || takeHeldSpace(b) == b) return
+            if (!w.endsInWord(b) || putSpace(b) == b) return
         }
         val holds = SpaceRules.separates(target.after(1))
         clearSpaces()
