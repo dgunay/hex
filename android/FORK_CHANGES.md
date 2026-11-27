@@ -328,6 +328,26 @@ These are listed with their features; the bugs aren't in upstream's code.
   `adb shell run-as ly.anoma.hex cp /data/local/tmp/model.gguf no_backup/neural-models/`. A change takes effect at the
   next word (`NeuralModels`, `TypingPreferences.neuralModel`); the typing log notes which model loaded. Speed test
   uses the chosen one. Commit: Android Keyboard: Neural autocorrect can use a model copied onto the phone (Labs).
+- **Fine-tuned model (local, not shipped):** SmolLM2-135M fine-tuned on chat-like text reads casual typing better.
+  The model on the phone is the one taken after 5M tokens of training.
+  - Recipe: 4M short texts, each one starting at the scorer's start token, like a field's text before a word:
+    45% Discord-Dialogues messages, 25% SODA dialogue lines, and 30% FineWeb-Edu runs of 1–3 sentences (to keep
+    tidy prose). Full fine-tune, lr 1e-4, 6,144 tokens per batch, texts cut at 128 tokens, on one consumer GPU
+    (~2,500 tokens/s, about 35 minutes to 5M). Then converted to q8_0 GGUF (145 MB, the same size as the download).
+  - Results (word errors %, autocorrect weight 1.5; lower is better):
+
+    | Test set | Word pairs | SmolLM2-135M | Fine-tuned, 5M | 10M | 20M |
+    |---|---|---|---|---|---|
+    | Tidy sentences | 4.90 | 3.34 | 3.41 | 3.40 | 3.44 |
+    | Discord | 7.28 | 5.53 | 4.57 | 4.65 | 4.59 |
+    | SMS | 7.17 | 6.21 | 5.64 | 5.57 | 5.73 |
+    | Spoken dialogue (SODA) | 2.92 | 2.02 | 1.72 | 1.66 | 1.71 |
+
+    Longer training didn't help, so 5M it is. Chat-only training (no FineWeb-Edu) did as well on chat (SMS 5.44)
+    but worse on tidy sentences (3.54). Of the bigger bases, not fine-tuned: Gemma 3 270M is a little better on
+    tidy sentences (3.27) and SODA (1.66) but worse on Discord (5.03) and SMS (5.95), and its benchmark ran about 3×
+    as long; SmolLM2-360M (4.94 Discord, 5.90 SMS) is about 2× as slow; Granite 4.0 350M did worse than word pairs.
+  - The training scripts and data live outside the repo, in this fork's local `.dev/lm`.
 - **What:** English autocorrect decides with a small language model that reads the text before the word (the
   keyboard's last 96 characters), instead of only the word before it. It picks the reading that fits the sentence,
   and it can tell a real word it has never seen ("tailscale") from a typo, because it scores words piece by piece
