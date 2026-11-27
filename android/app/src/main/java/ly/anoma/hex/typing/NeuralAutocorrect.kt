@@ -139,6 +139,9 @@ internal object NeuralAutocorrect : SpatialDecoder.NeuralScorer {
                 true
             }
             val answered = try { job.get(budgetMs, TimeUnit.MILLISECONDS) } catch (_: TimeoutException) { null } catch (_: Exception) { false }
+            // Too late: space has decided without it, so a read it hasn't started leaves the queue rather than hold
+            // up every task behind it (one already reading finishes, and its costs stay for the same word).
+            if (answered == null) job.cancel(false)
             val ended = SystemClock.elapsedRealtime()
             record(ended - started, answered == null)
             TypingLog.event {

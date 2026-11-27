@@ -321,6 +321,8 @@ Each setting's commits still use the names it had when it was added. Commit hash
   (`theWordsSpaceAsksAboutAreAskedAhead`). A missed space's reading, which space only asks about after the model's
   first answer, still waits. Background reads go 4 words at a time (12 before), so a space typed straight after a
   letter waits behind at most 4.
+- **Too late:** a read space gave up waiting for leaves the worker's queue if it hasn't started, so it never holds up
+  the reads behind it (the strip's, the next word's).
 - **Limits:**
   - English only. It needs the 145 MB download and keeps 224 MB in memory while loaded.
   - The weight isn't tuned yet, and the gate's short Tatoeba sentences can't show what longer context or
