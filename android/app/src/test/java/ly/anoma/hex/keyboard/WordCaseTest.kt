@@ -48,4 +48,14 @@ class WordCaseTest {
         shift.hold(); shift.up(); shift.down(0); shift.up()
         assertFalse(shift.locked)
     }
+
+    @Test fun shiftFollowsTheCaseATapGaveTheWord() {
+        val shift = ShiftState()
+        shift.hold(); shift.up(); shift.follow(capitals = true)   // "sf" → "SF": the letters after go on in capitals
+        assertTrue(shift.locked); assertTrue(shift.uppercase)
+        shift.typed()
+        assertTrue(shift.uppercase)
+        shift.hold(); shift.up(); shift.follow(capitals = false)  // "SF" → "sf"
+        assertFalse(shift.locked); assertFalse(shift.uppercase)
+    }
 }

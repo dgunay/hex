@@ -226,7 +226,7 @@ internal class KeyboardEngine(
         adaptive = adaptiveTouch(); adaptive?.beginSession()
         pad = Pad.of(attribute.inputType)
         symbols = pad != null
-        more = false; shift.reset()
+        more = false; shift.reset(); wordLock = false
         selStart = attribute.initialSelStart; selEnd = attribute.initialSelEnd
         refreshCaps(force = true)
     }
@@ -249,6 +249,10 @@ internal class KeyboardEngine(
             if (!swiping && ((s != null && (newSelStart != newSelEnd || !endsWith(s.word))) ||
                     (back != null && (newSelStart != newSelEnd || before() != back.second)))) {
                 forgetSwipe(); retries.forget(); showStrip(emptyList())
+            }
+            // The cursor left the ALL CAPS word a shift tap locked shift for: the lock goes with it.
+            if (wordLock && (newSelStart != newSelEnd || before().lastOrNull()?.isLetter() != true)) {
+                wordLock = false; if (shift.locked) { shift.follow(false); showPlane() }
             }
             refreshCaps()
             // The strip's Undo tool follows the autocorrection still being right before the cursor.
@@ -334,9 +338,10 @@ internal class KeyboardEngine(
      * as it lifts. Caps lock goes off as ever. */
     fun shiftDown() {
         if (symbols) return
-        recasing = feedback.shiftRecases && !shift.locked && recasable() != null
-        if (recasing) shift.hold() else shift.down(clock())
-        showPlane()
+        recasing = feedback.shiftRecases && recasable() != null
+        // Recasing, the keys stay as they are until it lifts and the word has its new case, rather than flash to
+        // capitals and back; a chord still types capitals.
+        if (recasing) shift.hold() else { shift.down(clock()); showPlane() }
     }
     /** Shift lifted; on the symbol pages its key switches between them, on lifting. */
     fun shiftUp() {
@@ -344,9 +349,11 @@ internal class KeyboardEngine(
         val was = shift.uppercase
         val chord = shift.up()
         if (recasing) { recasing = false; if (!chord) recase() }
-        if (was != shift.uppercase) showPlane()
+        if (was != shift.uppercase || chord) showPlane()
     }
     private var recasing = false
+    /** Shift locked because a tap made the word ALL CAPS: it goes off as the word ends. */
+    private var wordLock = false
     /** The word the cursor ends: the one being typed, else one in the field with nothing selected and no letter after
      * the cursor. Null in a password field. */
     private fun recasable(): String? {
@@ -362,6 +369,9 @@ internal class KeyboardEngine(
         val new = WordCase.next(old)
         logAfter { "recase ${TypingLog.q(old)} → ${TypingLog.q(new)}" }
         if (new == old) return
+        // Shift follows the word: locked for ALL CAPS, so the letters after it go on in capitals, off otherwise.
+        val capitals = new.length > 1 && new == new.uppercase() && new != new.lowercase()
+        shift.follow(capitals); wordLock = capitals; showPlane()
         edited(); undo = null; clearSpaces()
         val w = word
         val typing = w != null && w.token == old && endsWith(prefix + old)
@@ -556,6 +566,13 @@ internal class KeyboardEngine(
     private fun inputDone() {
         val was = shift.uppercase
         shift.typed()
+        if (wordLock && before().lastOrNull()?.isLetter() != true) {
+            // The ALL CAPS word a shift tap made has ended (space, a mark): its lock goes, and shift goes back to the
+            // field's own capitalisation.
+            wordLock = false
+            if (shift.locked) shift.follow(false)
+            shift.auto(capsWanted())
+        }
         if (was != shift.uppercase) showPlane()
     }
     /** The letter a touch near a key's edge types: the key it landed on, or a neighbour within
