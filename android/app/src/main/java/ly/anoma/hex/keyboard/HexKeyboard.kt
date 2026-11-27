@@ -137,9 +137,9 @@ class HexKeyboard : InputMethodService() {
     private fun typingLogChanged() {
         TypingLog.configure(this, feedback.typingLog)
         if (TypingLog.on) TypingLog.write("== settings " + getSharedPreferences("typing", MODE_PRIVATE).all
-            .filter { it.value is Boolean || it.key == TypingPreferences.NEURAL_BUDGET }.toSortedMap().entries.joinToString(" "))
+            .filter { it.value is Boolean || it.key == TypingPreferences.NEURAL_BUDGET || it.key == TypingPreferences.NEURAL_MODEL }.toSortedMap().entries.joinToString(" "))
     }
-    private fun neuralChanged() = NeuralAutocorrect.configure(this, feedback.neuralAutocorrect, feedback.neuralBudget)
+    private fun neuralChanged() = NeuralAutocorrect.configure(this, feedback.neuralAutocorrect, feedback.neuralBudget, feedback.neuralModel)
     private val typingChanged = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
         if (key == TypingPreferences.SUGGEST_SWEAR_WORDS) engine.swearWordsChanged()
         if (key == TypingPreferences.KEY_COLORS || key == TypingPreferences.KEY_COLOR) recolor()
@@ -153,12 +153,14 @@ class HexKeyboard : InputMethodService() {
         if (key == TypingPreferences.PASSWORD_MANAGER_SUGGESTIONS) clearInline()
         if (key == TypingPreferences.HEIGHT) resize()
         if (key == TypingPreferences.ADAPTIVE_TOUCH) engine.adaptiveTouchChanged()
-        if (key == TypingPreferences.NEURAL_AUTOCORRECT || key == TypingPreferences.NEURAL_BUDGET) neuralChanged()
+        if (key == TypingPreferences.NEURAL_AUTOCORRECT || key == TypingPreferences.NEURAL_BUDGET ||
+            key == TypingPreferences.NEURAL_MODEL) neuralChanged()
         if (key == TypingPreferences.HEX_KEY_LEFT) view?.hexKeySideChanged()
         if (key == TypingPreferences.USE_IMPORTED_WORDS || key == TypingPreferences.IMPORTED_WORDS) engine.personalWordsChanged()
         if (key == TypingPreferences.CLIPBOARD_HISTORY) clipKeeper.sync()
         if (key == TypingPreferences.TYPING_LOG) typingLogChanged()
-        else if (key != null && TypingLog.on) TypingLog.write("== setting $key = ${getSharedPreferences("typing", MODE_PRIVATE).all[key]?.takeIf { it is Boolean || it is Number }}")
+        else if (key != null && TypingLog.on) TypingLog.write("== setting $key = ${getSharedPreferences("typing", MODE_PRIVATE).all[key]
+            ?.takeIf { it is Boolean || it is Number || key == TypingPreferences.NEURAL_MODEL }}")
     }
     // The strip's Paste tool comes and goes with the clipboard (Labs › Keyboard › Keyboard tools): the
     // listener exists only while the lab is on and the input view is shown.

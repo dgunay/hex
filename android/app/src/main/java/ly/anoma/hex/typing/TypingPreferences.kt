@@ -149,6 +149,11 @@ internal class TypingPreferences(context: Context) {
     var neuralAutocorrect: Boolean
         get() = prefs.getBoolean(NEURAL_AUTOCORRECT, false)
         set(value) { prefs.edit().putBoolean(NEURAL_AUTOCORRECT, value).apply() }
+    /** Labs › Keyboard › Neural autocorrect › Model: a model copied onto the phone ([NeuralModels]) to use instead of the
+     * downloaded one; empty for the downloaded one. */
+    var neuralModel: String
+        get() = prefs.getString(NEURAL_MODEL, "").orEmpty()
+        set(value) { prefs.edit().putString(NEURAL_MODEL, value).apply() }
     /** How long space waits for Neural autocorrect's model before the word pairs decide, in ms. Not in Settings. */
     val neuralBudget: Int get() = prefs.getInt(NEURAL_BUDGET, NEURAL_BUDGET_DEFAULT).coerceIn(5, 5000)
     /** Labs › Keyboard › Clipboard history: the last texts copied, kept on this phone and offered in the Hex menu
@@ -254,6 +259,7 @@ internal class TypingPreferences(context: Context) {
         const val ADAPTIVE_TOUCH = "adaptiveTouch"
         const val NEURAL_AUTOCORRECT = "neuralAutocorrect"
         const val NEURAL_BUDGET = "neuralBudget"
+        const val NEURAL_MODEL = "neuralModel"
         const val NEURAL_BUDGET_DEFAULT = 90
         const val USE_IMPORTED_WORDS = "importedWords"
         /** A counter [ImportedWords] bumps whenever the imported list changes, so the keyboard reads it again. */

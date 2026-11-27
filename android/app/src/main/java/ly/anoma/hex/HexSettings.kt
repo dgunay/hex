@@ -57,6 +57,7 @@ import ly.anoma.hex.speech.*
 import ly.anoma.hex.typing.AdaptiveTouchModel
 import ly.anoma.hex.typing.AdaptiveTouchStore
 import ly.anoma.hex.typing.NeuralAutocorrect
+import ly.anoma.hex.typing.NeuralModels
 import ly.anoma.hex.typing.TypingPreferences
 import ly.anoma.hex.keyboard.Tap
 import ly.anoma.hex.keyboard.tap
@@ -214,6 +215,7 @@ internal fun HexSettings(setup: Setup, speech: SpeechPreferences, typing: Typing
     // shown, and the speed test's result once it has run.
     val neuralTiming = remember(revision, page) { NeuralAutocorrect.timing() }
     var neuralTest by remember { mutableStateOf<List<Long>?>(null) }
+    var neuralModel by remember(revision) { mutableStateOf(typing.neuralModel) }
     var neuralTesting by remember { mutableStateOf(false) }
     val passwordManager = remember(revision) { typing.passwordManagerSuggestions }
     val voiceOnly = remember(revision) { typing.voiceOnly }
@@ -728,6 +730,8 @@ internal fun HexSettings(setup: Setup, speech: SpeechPreferences, typing: Typing
                                 }
                                 Rule()
                                 NeuralRows(neuralOn, neural, neuralTiming, neuralTest, neuralTesting,
+                                    model = neuralModel, models = remember(neuralOn) { NeuralModels.names(context) },
+                                    choose = { typing.neuralModel = it; neuralModel = it; neuralTest = null },
                                     toggle = {
                                         typing.neuralAutocorrect = it
                                         // Off stops a download under way; a finished one stays until Delete download.
@@ -968,13 +972,30 @@ private fun PracticeCard(practice: String, mod: Modifier = Modifier, change: (St
 /** Labs › Keyboard › Neural autocorrect: the switch, its download as Faster English dictation's, how long space has waited
  * for the model, and a speed test. */
 @Composable private fun NeuralRows(on: Boolean, state: ModelStore.State, timing: NeuralAutocorrect.Timing, test: List<Long>?,
-                                   testing: Boolean, toggle: (Boolean) -> Unit, runTest: () -> Unit) {
+                                   testing: Boolean, model: String, models: List<String>, choose: (String) -> Unit,
+                                   toggle: (Boolean) -> Unit, runTest: () -> Unit) {
     val context = LocalContext.current
     val size = ModelStore.neural.megabytes
     Toggle(stringResource(R.string.neural_autocorrect), stringResource(R.string.neural_autocorrect_detail, size), on,
         noteLines = Int.MAX_VALUE, change = toggle)
     if (!on) return
     Rule()
+    // Models copied onto the phone ([NeuralModels]), to choose instead of the download: shown only when there are some.
+    if (models.isNotEmpty()) {
+        var open by remember { mutableStateOf(false) }
+        val downloaded = stringResource(R.string.neural_model_downloaded)
+        Box {
+            Entry(stringResource(R.string.neural_model), value = model.ifEmpty { downloaded } + " ▾", action = { open = true })
+            androidx.compose.material3.DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+                (listOf("") + models).forEach { name ->
+                    androidx.compose.material3.DropdownMenuItem(
+                        text = { Label(name.ifEmpty { downloaded }, weight = if (name == model) FontWeight.Medium else FontWeight.Normal) },
+                        onClick = { open = false; choose(name) })
+                }
+            }
+        }
+        Rule()
+    }
     when (state) {
         ModelStore.State.Available, ModelStore.State.WaitingForWifi -> Entry(stringResource(R.string.fast_english_download, size), value = "",
             action = { ModelStore.neural.download(context) })

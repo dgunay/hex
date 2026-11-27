@@ -220,6 +220,8 @@
     <string name="fix_earlier_words">Fix earlier words</string>
     <string name="neural_autocorrect">Neural autocorrect</string>
     <string name="neural_autocorrect_detail">Corrects English words using the words before them, with a small language model on the phone. One-time %1$d MB download.</string>
+    <string name="neural_model">Model</string>
+    <string name="neural_model_downloaded">Downloaded SmolLM2-135M</string>
     <string name="neural_test">Test speed</string>
     <string name="neural_testing">Testing speed…</string>
     <string name="neural_test_result">Typical word %1$d ms · slowest %2$d ms · Test again</string>
