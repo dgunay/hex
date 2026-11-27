@@ -11,11 +11,15 @@ also on, a fix that changes nothing for anyone who never hits the case (listed b
 **Settings › Keyboard**, or in Labs where it extends an existing lab. With everything off, the keyboard behaves as
 upstream's does.
 
+The demos were recorded on the Android emulator in dark mode; the circles are where a finger touched. Features that need sound, a microphone or the neural model have none.
+
 Each setting's commits still use the names it had when it was added. Commit hashes are on the fork's branch and change when the branch is rebased; the subject lines stay the same.
 
 ## Layout
 
 ### Remove bottom margin
+
+![The keyboard with Remove bottom margin off and on](docs/fork-demos/remove-bottom-margin.png)
 
 - **Switch:** Settings › Keyboard › Remove bottom margin (off). Changing it rebuilds the keyboard in place.
 - **What:** removes the gap under the bottom row, so the bottom row's keycaps end where the system's navigation
@@ -40,6 +44,8 @@ Each setting's commits still use the names it had when it was added. Commit hash
 - **Commit:** Android Keyboard: Key click volume.
 
 ### Steadier suggestion strip, and More suggestions (Labs)
+
+![Typing "see you to", scrolling the strip past its three slots and picking "today"](docs/fork-demos/more-suggestions.gif)
 
 - **What:** while a word is typed, a word already shown in the strip keeps its slot when a later strip for the same
   word comes (the fix after the pause, Neural autocorrect's ranked completions). With Labs › Keyboard › More
@@ -70,6 +76,8 @@ Each setting's commits still use the names it had when it was added. Commit hash
 - **Commit:** `d0ddec12` Android Keyboard: Hold delay (Labs).
 
 ### SwiftKey layout (Labs)
+
+![Held A types @, held T types 5, a flick right off the period types ?, then the 123 and {&= pages](docs/fork-demos/swiftkey-layout.gif)
 
 - **Switch:** Labs › Keyboard › SwiftKey layout (off).
 - **What:** Microsoft SwiftKey's arrangement (English QWERTY, Android), for muscle memory carried over from it
@@ -107,6 +115,8 @@ Each setting's commits still use the names it had when it was added. Commit hash
   - `a33ba194` Android Keyboard: SwiftKey layout's comma shows a microphone
 
 ### Shift changes a word's case (Labs)
+
+![Shift taps turn "sf" into "Sf" and then "SF"](docs/fork-demos/shift-recase.gif)
 
 - **Switch:** Labs › Keyboard › Shift changes a word's case (off).
 - **What:** with the cursor at the end of a word, the one being typed or one already in the field, a shift tap cycles
@@ -158,12 +168,18 @@ On for everyone. "Upstream too" means the bug is in code upstream also has, so t
 
 ### A closing double quote takes the space before it
 
+![A closing quote typed after "see you soon " takes the space before it](docs/fork-demos/closing-quote.gif)
+
 - **What:** a `"` (or `”`) typed when a quote is open in the paragraph takes the space before it, whether a pick, an
   autocorrection or you typed it: `"hello there "` then `"` is `"hello there"`. An opening quote keeps its space.
 - **Why:** reported: deleting the space before a closing quote by hand.
 - **How:** `SpaceRules.closesQuote`: an odd count of `"`, or more `“` than `”`, in the paragraph before the cursor
   (up to 1,000 characters). `KeyboardEngine.type` lets it take the space as a clause mark takes a picked one.
 - **Upstream too:** yes. Upstream's marks take a picked space only for `,.!?;:)`.
+- **Limits:** on the standard layout `"` is on the ?123 page, and switching pages (`KeyboardEngine.mode`, upstream's)
+  forgets the space just typed, so a closing quote from there keeps it. On SwiftKey layout `"` is a held C, with no
+  page switch, and it works (the demo). Not fixed yet: keeping the space across a page switch would change
+  upstream's page switch for its other marks too.
 - **Commit:** `9eb39c51` Android Keyboard: Picks and spaces in the middle of text
 
 ### Fixes to this fork's own features
@@ -177,6 +193,8 @@ These are listed with their features; the bugs aren't in upstream's code.
 ## Delete
 
 ### Delete words when held
+
+![Holding delete with Delete words when held off and on](docs/fork-demos/delete-words.gif)
 
 - **Switch:** Settings › Keyboard › Delete words when held (off). While it's on, two sliders show under it:
   - **Initial delay:** 200–1000 ms in steps of 50, 500 by default.
@@ -209,9 +227,12 @@ These are listed with their features; the bugs aren't in upstream's code.
 
 ### Stronger autocorrect
 
+!["that was so embarasing" typed with Stronger autocorrect off and on](docs/fork-demos/stronger-autocorrect.gif)
+
 - **Switch:** Settings › Keyboard › Stronger autocorrect, under Autocorrect (off).
-- **What:** corrects sloppier typing. "kehbaodd" becomes "keyboard" and "suggesfjkn" becomes "suggestion",
-  which upstream leaves as typed.
+- **What:** corrects sloppier typing. "embarasing", "neccesary", "convinience" and "restaraunt" (two slips each) are
+  fixed, which upstream leaves as typed. The unit test's "kehbaodd" → "keyboard", typed on key centres, isn't fixed
+  with real taps on the emulator (not yet looked into).
 - **Why:** upstream's decoder allows one edit from a word, so a fast typist's long word with two slips is never
   fixed. SwiftKey fixes these.
 - **How:** two changes in `SpatialDecoder`, both gated by its `strong` flag:
@@ -229,6 +250,8 @@ These are listed with their features; the bugs aren't in upstream's code.
   The fallback's contest: Android Keyboard: Stronger autocorrect still reads a letter typed for the space.
 
 ### Fix earlier words
+
+![Tapping back into "by" in "I want to by a car" and picking "buy"](docs/fork-demos/fix-earlier-words.gif)
 
 - **Switch:** Settings › Keyboard › Fix earlier words (off).
 - **What:** as SwiftKey does, put the cursor back into a finished word, by deleting back into it or tapping it,
@@ -283,6 +306,8 @@ These are listed with their features; the bugs aren't in upstream's code.
   recorded.
 
 ### Learn new words
+
+!["tailscale" corrected to "tail scale", undone with delete and added to the dictionary, then kept when typed again](docs/fork-demos/learn-new-words.gif)
 
 - **Switch:** Settings › Keyboard › Learn new words (off).
 - **What:** as SwiftKey does, a word you keep the way you typed it joins your personal dictionary, so autocorrect
@@ -452,6 +477,8 @@ These are listed with their features; the bugs aren't in upstream's code.
 
 ### Emoji shortcodes (Labs)
 
+![Typing :fire and :piz and picking 🔥 and 🍕 from the strip](docs/fork-demos/emoji-shortcodes.gif)
+
 - **Switch:** Labs › Keyboard › Emoji shortcodes (off).
 - **What:** type a colon and a name, such as `:fire`, and the strip offers its emoji (🔥, then others the name
   starts or describes: `:piz` offers 🍕). Tap one to put it in place of the `:name`, or type the closing colon
@@ -471,6 +498,8 @@ These are listed with their features; the bugs aren't in upstream's code.
 - **Commit:** Android Keyboard: Emoji shortcodes (Labs).
 
 ### Emoji search (Labs)
+
+![Searching the emoji panel for "moon" and picking 🌙](docs/fork-demos/emoji-search.gif)
 
 - **Switch:** Labs › Keyboard › Emoji search (off).
 - **What:** a 🔍 key in the emoji panel's bottom row, between ABC and the space bar. Tapping it brings back the
@@ -584,6 +613,8 @@ These are listed with their features; the bugs aren't in upstream's code.
 ## Diagnostics
 
 ### Typing log (Labs)
+
+![Mark a problem from the Hex menu, then a note typed into its box](docs/fork-demos/mark-a-problem.gif)
 
 - **Switch:** Labs › Keyboard › Typing log (off), with Delete typing log and its size below it.
 - **What:** a plain-text log, on the phone only, of every key (and where it was tapped), strip pick, swipe, delete,
