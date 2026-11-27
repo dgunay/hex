@@ -167,6 +167,8 @@ internal class KeyboardEngine(
     // A space typed after an unchanged word keeps it. Off, it is never set, so nothing changes.
     private var fixedAnchor: String? = null
     private var heldAnchor: String? = null
+    /** Space was tapped once at [heldAnchor]: it kept the held space rather than add one. */
+    private var heldSpaced = false
     var secure = true
         private set
     // Undo dictation, as iPhone Hex's: the dictation just inserted and the text after it then, offered
@@ -392,7 +394,7 @@ internal class KeyboardEngine(
     private fun resetTyping() {
         cancelChip(); word?.reset(); undo = null; expectedCaret = -1; prefix = ""
     }
-    private fun clearSpaces() { spaceAnchor = null; pickedAnchor = null; fixedAnchor = null; heldAnchor = null; swipeAnchor = null }
+    private fun clearSpaces() { heldSpaced = false; spaceAnchor = null; pickedAnchor = null; fixedAnchor = null; heldAnchor = null; swipeAnchor = null }
 
     // Labs › Keyboard › Adaptive touch while it is on: the word reads your own key centres once it has them.
     private var adaptive: AdaptiveTouch? = null
@@ -518,7 +520,9 @@ internal class KeyboardEngine(
         val shows = w != null && before != null && !symbols && canEndWord() &&
             !KeyboardTools.showsInEmptyField(feedback.keyboardTools, before) { target.after(1) }
         // Keyed apart from any typed word ("\u0000"), so a word shown keeps its slot when the model's order comes.
-        surface?.suggestions(if (shows) w!!.predictions(before!!, capitalize = capsWanted()).map { shown(Suggestion(it, Suggestion.Kind.Next)) }
+        // Labs › Keyboard › More suggestions: the next words past the three slots, a scroll away, as for a word typed.
+        val count = if (feedback.moreSuggestions) TypingWord.NEXT_WORDS else Suggestion.SLOTS
+        surface?.suggestions(if (shows) w!!.predictions(before!!, capitalize = capsWanted()).take(count).map { shown(Suggestion(it, Suggestion.Kind.Next)) }
             else emptyList(), "\u0000" + before.orEmpty())
         // Labs › Keyboard › Neural autocorrect: the model's order, once it has read the sentence, if nothing was typed since.
         if (shows) w!!.rankPredictions(before!!, { main.post(it) }) {
@@ -593,7 +597,7 @@ internal class KeyboardEngine(
     private fun takeHeldSpace(before: String): String {
         val held = heldAnchor != null && heldAnchor == before
         if (!held && (swipeAnchor == null || swipeAnchor != before)) return before
-        heldAnchor = null; swipeAnchor = null
+        heldAnchor = null; swipeAnchor = null; heldSpaced = false
         if (!target.commit(" ")) return before
         if (expectedCaret >= 0) expectedCaret++
         return "$before "
@@ -618,10 +622,16 @@ internal class KeyboardEngine(
         val w = word ?: return
         if (pickSwiped(text) || pickEarlier(text)) return
         edited()
-        if ((symbols && w.token.isEmpty()) || !canEndWord()) return
+        // With a letter right after the cursor (Gmail's Smart Compose shows its suggestion as text there), the word goes
+        // in with its space before it, rather than the tap doing nothing.
+        if ((symbols && w.token.isEmpty()) || secure) return
         val old = w.token
         if (old.isNotEmpty() && !endsWith(prefix + old)) { resetTyping(); surface?.suggestions(emptyList()); return }
-        if (old.isEmpty() && !w.startsWord(before())) return
+        // A next word picked where a pick held its space: that space goes in first, as it would for a typed letter.
+        if (old.isEmpty() && !w.startsWord(before())) {
+            val b = before()
+            if (heldAnchor == null || heldAnchor != b || takeHeldSpace(b) == b) return
+        }
         val holds = SpaceRules.separates(target.after(1))
         clearSpaces()
         val committed = smartWord(text)
@@ -665,7 +675,10 @@ internal class KeyboardEngine(
         val b = before()
         when {
             // The text after the cursor already separates the picked word: space has nothing to add.
-            heldAnchor != null && heldAnchor == b -> { clearSpaces(); showPredictions(b); return }
+            // Once, it keeps the held space for the next word, as a space after a pick is swallowed ("up to", space,
+            // "be" is "up to be"); a second space goes in.
+            heldAnchor != null && heldAnchor == b && !heldSpaced -> { heldSpaced = true; showPredictions(b); return }
+            heldAnchor != null && heldAnchor == b -> clearSpaces()
             pickedAnchor != null && pickedAnchor == b -> { clearSpaces(); spaceAnchor = b; spaceAt = now; showPredictions(b); return }
             (word != null || (wordField && literalLayout)) && !exactField && spaceAnchor == b && now - spaceAt <= SpaceRules.DOUBLE_SPACE_MS && SpaceRules.periodFits(b) -> {
                 clearSpaces()
@@ -735,7 +748,10 @@ internal class KeyboardEngine(
         // A clause-ending mark takes the space a picked suggestion, an autocorrection or a text replacement typed
         // ("Hello,"); in a URL field, so does any mark that joins a word ("github." and "github/", never "github /").
         val typedSpace = (pickedAnchor != null && pickedAnchor == b) || (fixedAnchor != null && fixedAnchor == b)
-        if (value.length == 1 && SpaceRules.takesPickedSpace(value[0], exactField) && typedSpace && b.endsWith(" ")) {
+        // A closing double quote takes it too, and a space you typed as well: a quote never closes after a space.
+        val closes = value.length == 1 && !exactField && b.endsWith(" ") && (typedSpace || (spaceAnchor != null && spaceAnchor == b)) &&
+            SpaceRules.closesQuote(value[0], if (secure) "" else target.before(1000).orEmpty().dropLast(1))
+        if (closes || (value.length == 1 && SpaceRules.takesPickedSpace(value[0], exactField) && typedSpace && b.endsWith(" "))) {
             clearSpaces()
             if (replace(" ", value)) { resetTyping(); showPredictions(before()); inputDone(); return }
         }
@@ -1267,7 +1283,9 @@ internal class KeyboardEngine(
         val typed = fixes.lastOrNull { it.language == language && it.replacement == at.text }?.original
         val pool = reader.revisitPool(at.text, at.before, at.next, grid).filterNot { !it.stands && it.text.equals(typed, ignoreCase = true) }
         fun slots(words: List<String>) = (listOfNotNull(typed?.let { Suggestion(it, Suggestion.Kind.Typed) }) +
-            words.take(TypingWord.REVISIT_WORDS).map { Suggestion(it, Suggestion.Kind.Word) }).take(Suggestion.SLOTS)
+            words.take(TypingWord.REVISIT_SHOWN).map { Suggestion(it, Suggestion.Kind.Word) })
+            // Labs › Keyboard › More suggestions: the rest past the three slots, a scroll away.
+            .take(if (feedback.moreSuggestions) TypingWord.REVISIT_SHOWN else Suggestion.SLOTS)
         val first = slots(pool.filter { it.offered && !it.stands }.map { it.text })
         // Labs › Keyboard › Neural autocorrect: the model reads each word in its sentence, the words after it as well as
         // before, and its order replaces the word pairs' once it answers. Its likeliest may be one the pairs left out.

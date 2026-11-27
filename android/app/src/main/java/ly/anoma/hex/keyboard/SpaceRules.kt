@@ -18,6 +18,15 @@ internal object SpaceRules {
      * in a URL field any joiner too ("github" picked, then "." or "/" gives "github." or "github/"). */
     fun takesPickedSpace(mark: Char, url: Boolean) = mark in CLAUSE_MARKS || (url && mark in JOINERS)
 
+    /** Whether [mark] is a double quote that closes one opened earlier in the paragraph [before] ends: an odd count of
+     * straight ones before it, or more “ than ”. It then goes against the word, taking the space before it
+     * (`she said "hi` "hi" picked, then `"`, gives `"hi"`, never `"hi "`). */
+    fun closesQuote(mark: Char, before: String): Boolean {
+        if (mark != '"' && mark != '”') return false
+        val paragraph = before.substringAfterLast('\n')
+        return paragraph.count { it == '"' } % 2 == 1 || paragraph.count { it == '“' } > paragraph.count { it == '”' }
+    }
+
     /** Whether ". " may replace the space that ends [before]: it follows a letter or a digit. */
     fun periodFits(before: String) = before.length >= 2 && before.last() == ' ' &&
         before[before.length - 2].let { it.isLetterOrDigit() }
