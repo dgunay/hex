@@ -5,8 +5,9 @@ came from switching to Hex's keyboard after SwiftKey and missing what it did. Th
 can be rebuilt upstream without taking this code: what it does, where its switch is, why it exists, how it
 works (the thresholds and Android APIs it relies on), its known limits, and its commit.
 
-Every change is off by default, except the Android 17 voice hand-back, a fix that changes nothing for anyone who
-never hits the case (listed below). Each setting is a toggle in
+Every feature is off by default. Bug fixes are on for everyone and listed under [Fixes](#fixes), each saying whether
+the bug is in upstream's code too, since those are the easiest to send upstream. The Android 17 voice hand-back is
+also on, a fix that changes nothing for anyone who never hits the case (listed below). Each setting is a toggle in
 **Settings › Keyboard**, or in Labs where it extends an existing lab. With everything off, the keyboard behaves as
 upstream's does.
 
@@ -66,6 +67,7 @@ Each setting's commits still use the names it had when it was added. Commit hash
   `TALK_HOLD_MS`.
 - **Limits:** the space bar's long press (the language menu) keeps Android's own delay (Accessibility › Touch & hold
   delay).
+- **Commit:** `d0ddec12` Android Keyboard: Hold delay (Labs).
 
 ### SwiftKey layout (Labs)
 
@@ -98,6 +100,11 @@ Each setting's commits still use the names it had when it was added. Commit hash
   - Taken from screenshots of SwiftKey on one phone; the symbol pages' keys aren't sized exactly as SwiftKey's.
   - A local currency (Labs) takes $'s place on x and the 123 page, and $ takes its slot on {&=, as on Gboard's
     pages.
+- **Commits:**
+  - `ca3dea84` Android Keyboard: SwiftKey layout (Labs)
+  - `4cf44411` Android Keyboard: SwiftKey layout's held comma dictates
+  - `8ed355c2` Android Keyboard: SwiftKey layout's period flicks to its punctuation
+  - `a33ba194` Android Keyboard: SwiftKey layout's comma shows a microphone
 
 ### Shift changes a word's case (Labs)
 
@@ -118,27 +125,54 @@ Each setting's commits still use the names it had when it was added. Commit hash
   - At a word, a tap no longer turns shift on for the next letter (hold shift for a capital mid-word: "iP"), and two
     quick taps there recase twice rather than lock caps. Caps lock still goes off with a tap.
   - The cursor must end the word: inside a word, or after its space, shift is as before.
+- **Commits:**
+  - `739c9e87` Android Keyboard: Shift changes a word's case (Labs)
+  - `ad40800a` Android Keyboard: Shift's keys follow a recased word's case (Labs)
 
-### Picks and spaces in the middle of text
+## Fixes
 
-- **What:** fixes from a day's typing log, all where text follows the cursor.
-  - A next word picked right after a word, with no space before the cursor, goes in with a space before it: after a
-    pick that held its space ("up to‸ best") or a word you came back to ("you'll‸ soon"). The strip offers next words
-    there because it treats the word as finished, and a tap used to do nothing. One rule,
-    `TypingWord.endsInWord`, now decides both.
-  - Space there keeps the held space for the next word, as a space after a pick is swallowed ("up to", space, "be"
-    is "up to be", not "up tobe"); a second space goes in.
-  - A pick with a letter right after the cursor (Gmail's Smart Compose shows its suggestion as text there) puts the
-    word in with its space before that text. The tap used to do nothing.
-  - A closing double quote takes the space before it, whether a pick, an autocorrection or you typed it, when a quote
-    is open in the paragraph (`"hello there "` then `"` is `"hello there"`). An opening quote keeps its space.
-- **Why:** reported: strip taps that stopped registering, and deleting a space before a closing quote by hand.
-- **How:** `KeyboardEngine.pickSuggestion` puts in the space the strip assumed (`putSpace`, which `takeHeldSpace`
-  also uses) where `TypingWord.endsInWord` (what `predictions` uses) says the word is finished, and no longer returns when
-  `canEndWord` is false; `space` swallows once at `heldAnchor` (`heldSpaced`); `type` lets
-  `SpaceRules.closesQuote` (an odd count of `"` or more `“` than `”` in the paragraph) take the space.
-- **Limits:** typing letters straight against the next word ("shapin‸the") still makes one word of them, which the
-  strip may then correct as a whole.
+On for everyone. "Upstream too" means the bug is in code upstream also has, so the fix could be offered to them;
+"not checked" means that is read from the code, not yet reproduced on a plain upstream build.
+
+### Strip taps that did nothing where text follows the cursor
+
+- **What:** a tap on a strip word was silently ignored in three places, all where text follows the cursor:
+  - after a word the strip treats as finished with no space before the cursor, whether a pick held its space
+    ("up to‸ best") or you came back to the word ("you'll‸ soon"): the strip offered next words, but a tap only went
+    in where a space was already typed. Now it puts that space in first.
+  - after a pick that held its space, space did nothing and the next word joined the last ("up tobe"). Now the first
+    space keeps the held space for the next word, and a second one goes in.
+  - with a letter right after the cursor, as with Gmail's Smart Compose, whose grey suggestion is text in the field.
+    Now the word goes in with its space before that text.
+- **Why:** found in the typing log: 37 of one day's 120 strip taps did nothing.
+- **How:** one rule, `TypingWord.endsInWord`, decides both where the strip offers next words (`predictions`) and where
+  `KeyboardEngine.pickSuggestion` puts the space in first (`putSpace`, shared with `takeHeldSpace`).
+  `pickSuggestion` no longer returns when `canEndWord` is false. `space` swallows once at `heldAnchor`
+  (`heldSpaced`).
+- **Upstream too:** yes, not checked. The held space, the next-word strip and the `canEndWord` check are upstream's.
+- **Limits:** letters typed straight against the next word ("shapin‸the") still make one word, which the strip may
+  then correct as a whole.
+- **Commits:**
+  - `9eb39c51` Android Keyboard: Picks and spaces in the middle of text
+  - `8e1048fb` Android Keyboard: A next word tapped after a word puts its space in
+
+### A closing double quote takes the space before it
+
+- **What:** a `"` (or `”`) typed when a quote is open in the paragraph takes the space before it, whether a pick, an
+  autocorrection or you typed it: `"hello there "` then `"` is `"hello there"`. An opening quote keeps its space.
+- **Why:** reported: deleting the space before a closing quote by hand.
+- **How:** `SpaceRules.closesQuote`: an odd count of `"`, or more `“` than `”`, in the paragraph before the cursor
+  (up to 1,000 characters). `KeyboardEngine.type` lets it take the space as a clause mark takes a picked one.
+- **Upstream too:** yes. Upstream's marks take a picked space only for `,.!?;:)`.
+- **Commit:** `9eb39c51` Android Keyboard: Picks and spaces in the middle of text
+
+### Fixes to this fork's own features
+
+These are listed with their features; the bugs aren't in upstream's code.
+
+- Neural autocorrect: a read space gave up on leaves the model's queue (`405f13ed`); see Neural autocorrect.
+- Shift changes a word's case: the keys follow the recased word (`ad40800a`).
+- More suggestions: next words and an earlier word's words scroll past three too (`9eb39c51`).
 
 ## Delete
 
@@ -168,6 +202,7 @@ Each setting's commits still use the names it had when it was added. Commit hash
   - `ebfb41a3` Android Keyboard: Hold delete for words takes only words, each with a heavy click
   - `b24e58b7` Android Keyboard: Hold delete for words starts slower; Diagnostics names its tap
   - `01f2486b` Android Keyboard: Hold delete for words waits 500 ms for the second word
+  - `83a4a823` Android Keyboard: Delete words when held's sliders sit indented under it
   - `fc7598bb` Android Keyboard: Hold delete for words' First wait and Speed-up
 
 ## Autocorrect
@@ -223,7 +258,9 @@ Each setting's commits still use the names it had when it was added. Commit hash
 - **Limits:**
   - It never shows in password fields, `TYPE_NULL` editors, number pads, or while symbols show.
   - Splits and joins ("deli ate" → "delicate") aren't remembered, since they change more than one word.
-- **Commit:** `9446017d` Android Keyboard: Fix earlier words offers other words for one you go back to.
+- **Commits:**
+  - `9446017d` Android Keyboard: Fix earlier words offers other words for one you go back to
+  - `639fd350` Android Keyboard: Fix earlier words reads the whole sentence with Neural autocorrect
   Its pick's space: Android Keyboard: Fix earlier words' pick takes its space as any pick does.
   The wider search and the model's order: Android Keyboard: Fix earlier words reads the whole sentence with Neural
   autocorrect.
@@ -276,7 +313,10 @@ Each setting's commits still use the names it had when it was added. Commit hash
   - A word you simply type and keep, without tapping it or undoing a fix, isn't learned. Hex keeps no record of
     what you type, so it can't count repeats the way SwiftKey does.
   - Words go into Android's shared personal dictionary, so other keyboards and spell checkers see them too.
-- **Commit:** Android Keyboard: Learn new words, as SwiftKey learns them.
+- **Commits:**
+  - Android Keyboard: Learn new words, as SwiftKey learns them
+  - `b416e443` Android Keyboard: removing a learned word also clears it from SwiftKey words
+  - `69b81440` Android Keyboard: Learn new words' description fits its two lines
 
 ### Neural autocorrect (Labs)
 
@@ -376,7 +416,10 @@ Each setting's commits still use the names it had when it was added. Commit hash
   - Completions come from the 24 commonest words with the letters typed (and the word pairs' few): one rarer
     than that ("gonna" for "g") shows only once more letters leave it among them.
   - Built for ARMv8.2 with dot product (every recent phone). Emulators that translate ARM can't run it.
-- **Commit:** Android Keyboard: Neural autocorrect, a small language model reading the sentence (Labs).
+- **Commits:**
+  - Android Keyboard: Neural autocorrect, a small language model reading the sentence (Labs)
+  - `99445880` Android Keyboard: Neural autocorrect reads the word's readings before space
+  - `405f13ed` Android Keyboard: Neural autocorrect drops a read space gave up on
 
 ## Emoji
 
@@ -414,7 +457,9 @@ Each setting's commits still use the names it had when it was added. Commit hash
   word must start a word of the emoji's name or keywords; whole name words first) finds up to 60. `EmojiSearchGrid`, between the
   strip and the keys, shows them. A found emoji goes into the panel's Recently used.
 - **Limits:** English words only. Your use doesn't rank the results.
-- **Commit:** Android Keyboard: Emoji search (Labs).
+- **Commits:**
+  - Android Keyboard: Emoji search (Labs)
+  - `3f90b3f7` Android Keyboard: Emoji search shows its results in a grid above the keys
 
 ## Dictation
 
@@ -499,7 +544,15 @@ Each setting's commits still use the names it had when it was added. Commit hash
   Upstream added the same behaviour as Labs › Keyboard › Punctuation after autocorrect (#2814, off by default), so
   this fork dropped its own always-on version and uses upstream's lab.
 - **Haptic strength** (a 10–100% slider for key taps). Removed from the fork as unneeded. Hold delete's heavier
-  per-word tap stayed.
+  per-word tap stayed. (`2d15ceca` Android Keyboard: Haptic strength slider under Haptics; `d2d592b1` Android
+  Keyboard: drop Haptic strength; plainer names for two settings.)
+
+## This fork's builds
+
+- Settings' main page names the fork, branch and commit a build came from, and Send feedback is gone, so reports
+  about this fork's builds don't reach upstream (`031e0239` Android: Settings' main page names the fork, branch and
+  commit it was built from; `d2a08c95` Android: no Send feedback in this fork's builds).
+- This page (`3667f4e0` Android: FORK_CHANGES.md lists this fork's keyboard changes).
 
 ## Diagnostics
 
@@ -520,4 +573,6 @@ Each setting's commits still use the names it had when it was added. Commit hash
 - **How:** `TypingLog` writes lines on its own thread. `KeyboardEngine` posts a snapshot after each entry point
   (`logAfter`), so it sees the text as the event left it; `StripView` logs each strip.
 - **Limits:** a line is two extra reads of the field's text per event, so typing is a little slower while it's on.
-- **Commit:** Android Keyboard: Typing log (Labs).
+- **Commits:**
+  - Android Keyboard: Typing log (Labs)
+  - `1c062d8d` Android Keyboard: Typing log records the neural model's timings
