@@ -347,7 +347,8 @@ These are listed with their features; the bugs aren't in upstream's code.
     but worse on tidy sentences (3.54). Of the bigger bases, not fine-tuned: Gemma 3 270M is a little better on
     tidy sentences (3.27) and SODA (1.66) but worse on Discord (5.03) and SMS (5.95), and its benchmark ran about 3×
     as long; SmolLM2-360M (4.94 Discord, 5.90 SMS) is about 2× as slow; Granite 4.0 350M did worse than word pairs.
-  - The training scripts and data live outside the repo, in this fork's local `.dev/lm`.
+  - Scripts, test sets and the data's sources: `benchmark/neural/` (its README). The data and checkpoints (~16 GB)
+    stay out of git, in a local work folder.
 - **What:** English autocorrect decides with a small language model that reads the text before the word (the
   keyboard's last 96 characters), instead of only the word before it. It picks the reading that fits the sentence,
   and it can tell a real word it has never seen ("tailscale") from a typo, because it scores words piece by piece
