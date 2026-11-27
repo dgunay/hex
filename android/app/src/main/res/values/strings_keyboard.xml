@@ -61,6 +61,7 @@
     <string name="keyboard_menu_mark_problem">Mark a problem</string>
     <string name="keyboard_note_hint">What went wrong? (optional)</string>
     <string name="keyboard_note_done">Keep the note</string>
+    <string name="keyboard_note_discard">Drop the note</string>
     <string name="keyboard_emoji_search">Search emoji</string>
     <string name="keyboard_emoji_search_back">Back to emoji</string>
     <string name="keyboard_emoji_search_none">No emoji found</string>

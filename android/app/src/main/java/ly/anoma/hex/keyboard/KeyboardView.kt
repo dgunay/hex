@@ -21,6 +21,8 @@ internal class KeyboardView(context: Context, private val ime: HexKeyboard) : Li
     /** The rows' height these keys were built at (Settings › Keyboard › Height on this screen). */
     private val size = KeySize.of(resources, ime.feedback.height)
     private val strip = StripView(context, ime, this)
+    // Typing log › Mark a problem's note, above the strip while it's open.
+    private val noteRow = NoteRow(context, discard = { ime.endNote(keep = false) }, keep = { ime.endNote(keep = true) })
     private val keys = KeyPlaneView(context, ime, this, feedback, size)
     // Labs › Keyboard › Emoji search: the emoji found, between the search line and the letter keys.
     private val searchGrid = EmojiSearchGrid(context) { e -> tap(context, ime.feedback.haptics, Tap.Press); ime.engine.pickSearchedEmoji(e) }
@@ -47,6 +49,7 @@ internal class KeyboardView(context: Context, private val ime: HexKeyboard) : Li
             insets
         }
         setBackgroundColor(context.getColor(R.color.keyboard))
+        addView(noteRow, LayoutParams(LayoutParams.MATCH_PARENT, noteRow.rowHeight))
         addView(strip, LayoutParams(LayoutParams.MATCH_PARENT, strip.stripHeight))
         searchGrid.visibility = GONE
         addView(searchGrid, LayoutParams(LayoutParams.MATCH_PARENT, searchGrid.gridHeight))
@@ -75,11 +78,10 @@ internal class KeyboardView(context: Context, private val ime: HexKeyboard) : Li
         searchGrid.visibility = if (query != null) VISIBLE else GONE
         if (query != null) searchGrid.show(query, results)
     }
-    override fun problemNote(text: String?) {
-        strip.emojiSearch(text, note = true)
-        if (text != null) searchGrid.visibility = GONE
-    }
     override fun toolsChanged() = strip.update()
+    /** Mark a problem's note: shown while open (null hides it), redrawn as it changes. */
+    fun note(note: NoteText?) = noteRow.show(note)
+    fun noteChanged() = noteRow.changed()
     override fun keyGrid() = keys.letterGrid()
     fun notice(notice: StripNotice?) = strip.notice(notice)
     /** The strip's notice showing now, if any. */

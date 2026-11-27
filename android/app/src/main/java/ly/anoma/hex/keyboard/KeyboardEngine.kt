@@ -41,8 +41,6 @@ internal interface KeyboardSurface {
     /** Labs › Keyboard › Emoji search: the search line in the strip's place, with what was typed and the emoji it finds;
      * a null [query] takes it away. */
     fun emojiSearch(query: String?, results: List<String>) {}
-    /** Mark a problem's note line in the strip's place, with what was typed; null takes it away. */
-    fun problemNote(text: String?) {}
     /** Offer Undo dictation, or stop offering it. */
     fun undoDictation(shown: Boolean)
     /** The strip's tools changed (Labs › Keyboard › Keyboard tools): Undo follows the last autocorrection. */
@@ -115,8 +113,6 @@ internal class KeyboardEngine(
         /** Labs › Keyboard › Emoji search: the most found emoji the strip scrolls through, and the longest search. */
         const val SEARCH_RESULTS = 60
         const val SEARCH_LENGTH = 40
-        /** The longest note Mark a problem takes. */
-        const val NOTE_LENGTH = 300
         /** Undo dictation stays this long unless something else happens first (iPhone Hex: 12 s). */
         const val UNDO_MS = 12_000L
         /** Autocorrections a field remembers for Keyboard › Fix earlier words. */
@@ -227,7 +223,6 @@ internal class KeyboardEngine(
             "options=0x${Integer.toHexString(attribute.imeOptions)}" + if (TypingLog.skipping) " (not logged)" else "")
         resetTyping(); word = null; clearSpaces(); forgetSwipe(); toldSwipe = false; fixes.clear(); earlier = null
         if (searching != null) { searching = null; surface?.emojiSearch(null, emptyList()) }
-        if (noting) { noting = false; surface?.problemNote(null) }
         adaptive = adaptiveTouch(); adaptive?.beginSession()
         pad = Pad.of(attribute.inputType)
         symbols = pad != null
@@ -603,11 +598,7 @@ internal class KeyboardEngine(
     fun letter(text: String, x: Double, y: Double, grid: KeyGrid, explicit: Boolean = false, aimed: Boolean = true) {
         logAfter { "letter $text @${x.toInt()},${y.toInt()}" + (if (explicit) " explicit" else "") + (if (!aimed) " unaimed" else "") }
         if (!target.connected) return
-        searching?.let {
-            // A note's shift goes off after a letter, as in the field (one capital, not all of them).
-            if (noting) { note(text); inputDone() } else if (it.length < SEARCH_LENGTH) it.append(text.lowercase())
-            showSearch(); return
-        }
+        searching?.let { if (it.length < SEARCH_LENGTH) it.append(text.lowercase()); showSearch(); return }
         edited(); kept.drop()
         val w = word
         if (w == null || symbols || !text.single().isLetter()) { type(text); return }
@@ -812,7 +803,6 @@ internal class KeyboardEngine(
         if (!target.connected) return
         searching?.let { q ->
             if (value == " ") space() else if (value == "\n") endEmojiSearch()
-            else if (noting) { note(value); showSearch() }
             else if (value.length == 1 && value[0].isLetterOrDigit() && q.length < SEARCH_LENGTH) { q.append(value.lowercase()); showSearch() }
             return
         }
@@ -886,17 +876,12 @@ internal class KeyboardEngine(
     fun markProblem() {
         if (TypingLog.skipping) { TypingLog.write("★ MARK (field not logged)"); return }
         logState("★ MARK")
-        // Then what went wrong, if you say: the letter keys type it into the strip's line, never into the field, as
-        // Emoji search's do; Return or its back arrow keeps it, after the mark.
-        if (!target.connected) return
-        edited(); resetTyping(); clearSpaces(); undo = null
-        if (searching != null) surface?.emojiSearch(null, emptyList())
-        noting = true; searching = StringBuilder(); showSearch()
+        afterMark()
     }
-    /** The strip's line holds Mark a problem's note rather than an emoji search. */
-    private var noting = false
-    val notingProblem get() = noting
-    private fun note(text: String) { searching?.let { if (it.length + text.length <= NOTE_LENGTH) it.append(text) } }
+    /** After a mark: the IME opens Mark a problem's note ([NoteRow]). */
+    var afterMark: () -> Unit = {}
+    /** The selection as the engine last heard of it, for the IME to come back to after the note. */
+    val selection get() = selStart to selEnd
 
     /** Labs › Keyboard › Emoji search: what has been searched while the letter keys type into it, else null. */
     private var searching: StringBuilder? = null
@@ -910,21 +895,12 @@ internal class KeyboardEngine(
     /** The search line's back, Return, or the emoji key: the keys type text again. */
     fun endEmojiSearch() {
         if (searching == null) return
-        if (noting) {
-            val text = searching.toString().trim()
-            if (text.isNotEmpty()) TypingLog.write("★ NOTE " + TypingLog.q(text))
-            noting = false; searching = null; surface?.problemNote(null)
-            val b = before()
-            showPredictions(if (word != null && TypingWord.boundary(b.lastOrNull())) b else null)
-            return
-        }
         searching = null; surface?.emojiSearch(null, emptyList())
         val b = before()
         showPredictions(if (word != null && TypingWord.boundary(b.lastOrNull())) b else null)
     }
     private fun showSearch() {
         val q = searching ?: return
-        if (noting) { surface?.problemNote(q.toString()); return }
         val index = emoji?.index
         if (index == null) {
             emoji?.loadIndex { main.post { if (searching === q) showSearch() } }
