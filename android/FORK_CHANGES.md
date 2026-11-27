@@ -568,7 +568,9 @@ These are listed with their features; the bugs aren't in upstream's code.
 - **What:** a plain-text log, on the phone only, of every key (and where it was tapped), strip pick, swipe, delete,
   cursor move and suggestion strip, each with the text around the cursor after it, the word being typed, the
   autocorrection Undo would take back, and which space rules are pending. The Hex menu's **Mark a problem** writes a
-  marker with the text as it is then. Settings changes and each field's app and input type are logged too.
+  marker with the text as it is then, and the strip then asks what went wrong (optional): the letter keys type the
+  note into the strip's line, never into the field, as Emoji search's do, and Return or the line's back arrow keeps
+  it in the log after the mark (up to 300 characters). Settings changes and each field's app and input type are logged too.
 - **Why:** to find the spacing and punctuation papercuts from a day of natural typing instead of from descriptions.
 - **Privacy:** password fields and fields that ask keyboards not to learn (incognito) are never logged, not even
   their keys. Files are in the app's private storage (`files/typing-log/`), read with
@@ -582,3 +584,4 @@ These are listed with their features; the bugs aren't in upstream's code.
 - **Commits:**
   - Android Keyboard: Typing log (Labs)
   - `1c062d8d` Android Keyboard: Typing log records the neural model's timings
+  - Android Keyboard: Mark a problem takes a note of what went wrong (Labs)

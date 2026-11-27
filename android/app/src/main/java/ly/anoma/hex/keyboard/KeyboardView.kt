@@ -75,6 +75,10 @@ internal class KeyboardView(context: Context, private val ime: HexKeyboard) : Li
         searchGrid.visibility = if (query != null) VISIBLE else GONE
         if (query != null) searchGrid.show(query, results)
     }
+    override fun problemNote(text: String?) {
+        strip.emojiSearch(text, note = true)
+        if (text != null) searchGrid.visibility = GONE
+    }
     override fun toolsChanged() = strip.update()
     override fun keyGrid() = keys.letterGrid()
     fun notice(notice: StripNotice?) = strip.notice(notice)

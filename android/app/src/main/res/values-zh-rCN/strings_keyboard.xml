@@ -41,6 +41,8 @@
     <string name="keyboard_letters">字母</string>
     <string name="keyboard_emoji">表情符号</string>
     <string name="keyboard_menu_mark_problem">标记问题</string>
+    <string name="keyboard_note_hint">哪里出错了？（可选）</string>
+    <string name="keyboard_note_done">保存说明</string>
     <string name="keyboard_emoji_search">搜索表情符号</string>
     <string name="keyboard_emoji_search_back">返回表情符号</string>
     <string name="keyboard_emoji_search_none">未找到表情符号</string>
