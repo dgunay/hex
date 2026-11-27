@@ -48,6 +48,10 @@ internal class ShiftState {
     /** Auto-capitalisation after an edit or a field change; leaves caps lock and a held shift alone. */
     fun auto(capitalize: Boolean) { if (mode != Mode.Locked && !held) mode = if (capitalize) Mode.On else Mode.Off }
 
+    /** Labs › Keyboard › Shift changes a word's case: shift shows the case a tap gave the word, locked for ALL CAPS
+     * (the letters after it go on in capitals) and off otherwise. */
+    fun follow(capitals: Boolean) { mode = if (capitals) Mode.Locked else Mode.Off; lastTapDown = -1 }
+
     fun reset() { mode = Mode.Off; held = false; typedWhileHeld = false; lastTapDown = -1 }
     fun forgetTap() { lastTapDown = -1 }
 }

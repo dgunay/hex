@@ -104,8 +104,11 @@ Each setting's commits still use the names it had when it was added. Commit hash
 - **What:** with the cursor at the end of a word, the one being typed or one already in the field, a shift tap cycles
   it lowercase → Title → ALL CAPS → lowercase ("sf", "Sf", "SF"), as Microsoft SwiftKey does. The strip offers its
   words in that case, and space keeps it as cased (no autocorrection). A word cased otherwise ("iPhone") goes to
-  Title. Away from a word, shift is as before.
-- **Why:** asked for: a lowercase "sf" the strip offered only in lowercase, wanted as "SF".
+  Title. Away from a word, shift is as before. The keys follow the word: ALL CAPS locks shift, so letters typed
+  after it are capitals too, until the word ends (space, a mark, the cursor leaving it); the other cases leave shift
+  off. The keys don't flash to capitals while shift is down for a recase.
+- **Why:** asked for: a lowercase "sf" the strip offered only in lowercase, wanted as "SF". The keys following the
+  word was asked for too: they went back to lowercase on every tap, whatever case the word was in.
 - **How:** `KeyboardEngine.shiftDown`/`recase`: at a word, shift only holds (`ShiftState.hold`), so a letter typed
   while it is held is still a capital (a chord) and nothing recases; a tap recases as it lifts. The word being typed
   keeps its place (`TypingWord.recase`, literal from then on); one in the field becomes the word being typed again,
