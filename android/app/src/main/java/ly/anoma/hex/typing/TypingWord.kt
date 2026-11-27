@@ -395,6 +395,10 @@ internal class TypingWord(val decoder: SpatialDecoder, val spatial: Boolean) {
             if (personal != null) personalized = true
         }
     }
+    /** Labs › Keyboard › Shift changes a word's case: the word as you cased it ([text], the same letters), kept as it is. */
+    fun recase(text: String) {
+        token = text; taps.clear(); drawn.clear(); decision = null; literalOnly = true
+    }
     fun explicit(text: String) {
         token += text; taps.clear(); drawn.clear(); decision = null; literalOnly = true
     }

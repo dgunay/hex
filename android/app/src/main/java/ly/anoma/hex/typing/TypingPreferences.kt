@@ -44,6 +44,10 @@ internal class TypingPreferences(context: Context) {
     var letterSymbols: Boolean
         get() = prefs.getBoolean("letterSymbols", false)
         set(value) { prefs.edit().putBoolean("letterSymbols", value).apply() }
+    /** Labs › Keyboard › Shift changes a word's case ([ly.anoma.hex.keyboard.WordCase]). */
+    var shiftRecases: Boolean
+        get() = prefs.getBoolean(SHIFT_RECASES, false)
+        set(value) { prefs.edit().putBoolean(SHIFT_RECASES, value).apply() }
     /** Labs › Keyboard › Number row: the digits above the letters. Off by default. */
     var numberRow: Boolean
         get() = prefs.getBoolean(NUMBER_ROW, false)
@@ -257,6 +261,7 @@ internal class TypingPreferences(context: Context) {
         const val EMOJI_SHORTCODES = "emojiShortcodes"
         const val EMOJI_SEARCH = "emojiSearch"
         const val TYPING_LOG = "typingLog"
+        const val SHIFT_RECASES = "shiftRecases"
         const val KEYBOARD_TOOLS = "keyboardTools"
         const val SMART_QUOTES = "smartQuotes"
         const val SWIPE_DELETE_LETTERS = "swipeDeleteLetters"

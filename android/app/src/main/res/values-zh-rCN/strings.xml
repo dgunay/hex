@@ -180,6 +180,8 @@
     <string name="signature_one_line">请使用一行</string>
     <string name="signature_too_long">请使用不超过 200 个字符</string>
     <string name="hold_delay">长按延迟</string>
+    <string name="shift_recases">Shift 键更改单词大小写</string>
+    <string name="shift_recases_detail">光标在单词末尾时轻点 Shift 键，单词依次变为首字母大写、全部大写、全部小写，与 Microsoft SwiftKey 相同。按住 Shift 键再输入字母仍可输入大写字母</string>
     <string name="letter_symbols">字母键上的符号</string>
     <string name="letter_symbols_detail">长按字母输入符号，例如长按 m 输入 ?</string>
     <string name="number_row">数字行</string>

@@ -230,6 +230,7 @@ internal fun HexSettings(setup: Setup, speech: SpeechPreferences, typing: Typing
     val haptics = remember(revision) { typing.haptics }
     val strongAutocorrect = remember(revision) { typing.strongAutocorrect }
     val letterSymbols = remember(revision) { typing.letterSymbols }
+    val shiftRecases = remember(revision) { typing.shiftRecases }
     val holdDelay = remember(revision) { typing.holdDelay }
     val numberRow = remember(revision) { typing.numberRow }
     val snugBottom = remember(revision) { typing.snugBottom }
@@ -614,6 +615,8 @@ internal fun HexSettings(setup: Setup, speech: SpeechPreferences, typing: Typing
                                 Toggle(stringResource(R.string.letter_symbols), stringResource(R.string.letter_symbols_detail),
                                     letterSymbols) { typing.letterSymbols = it }
                                 Rule()
+                                Toggle(stringResource(R.string.shift_recases), stringResource(R.string.shift_recases_detail),
+                                    shiftRecases, noteLines = Int.MAX_VALUE) { typing.shiftRecases = it }
                                 Toggle(stringResource(R.string.number_row), stringResource(R.string.number_row_detail),
                                     numberRow) { typing.numberRow = it }
                                 Rule()

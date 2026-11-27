@@ -98,6 +98,23 @@ Each setting's commits still use the names it had when it was added. Commit hash
     pages.
   - The comma has no microphone hint, as SwiftKey's does.
 
+### Shift changes a word's case (Labs)
+
+- **Switch:** Labs › Keyboard › Shift changes a word's case (off).
+- **What:** with the cursor at the end of a word, the one being typed or one already in the field, a shift tap cycles
+  it lowercase → Title → ALL CAPS → lowercase ("sf", "Sf", "SF"), as Microsoft SwiftKey does. The strip offers its
+  words in that case, and space keeps it as cased (no autocorrection). A word cased otherwise ("iPhone") goes to
+  Title. Away from a word, shift is as before.
+- **Why:** asked for: a lowercase "sf" the strip offered only in lowercase, wanted as "SF".
+- **How:** `KeyboardEngine.shiftDown`/`recase`: at a word, shift only holds (`ShiftState.hold`), so a letter typed
+  while it is held is still a capital (a chord) and nothing recases; a tap recases as it lifts. The word being typed
+  keeps its place (`TypingWord.recase`, literal from then on); one in the field becomes the word being typed again,
+  as an undone autocorrection does. `WordCase` holds the cycle.
+- **Limits:**
+  - At a word, a tap no longer turns shift on for the next letter (hold shift for a capital mid-word: "iP"), and two
+    quick taps there recase twice rather than lock caps. Caps lock still goes off with a tap.
+  - The cursor must end the word: inside a word, or after its space, shift is as before.
+
 ## Delete
 
 ### Delete words when held
