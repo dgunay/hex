@@ -183,6 +183,8 @@
     <string name="signature_too_long">请使用不超过 200 个字符</string>
     <string name="keyboard_tab">制表符</string>
     <string name="hold_delay">长按延迟</string>
+    <string name="hold_click">长按弹出时轻震</string>
+    <string name="hold_click_detail">长按按键弹出符号或重音字母时轻震一下（需开启触感反馈）</string>
     <string name="swiftkey_layout">SwiftKey 布局</string>
     <string name="swiftkey_layout_detail">长按字母输入 Microsoft SwiftKey 的符号，底行表情符号键在逗号之前，以及它的句号弹出</string>
     <string name="shift_recases">Shift 键更改单词大小写</string>

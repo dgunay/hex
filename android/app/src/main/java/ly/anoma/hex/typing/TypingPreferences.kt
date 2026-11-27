@@ -82,6 +82,11 @@ internal class TypingPreferences(context: Context) {
     var holdDelay: Int
         get() = prefs.getInt(HOLD_DELAY, HOLD_DELAY_DEFAULT).coerceIn(HOLD_DELAY_RANGE)
         set(value) { prefs.edit().putInt(HOLD_DELAY, value.coerceIn(HOLD_DELAY_RANGE)).apply() }
+    /** Labs › Keyboard › Click when a hold opens: a key's held symbols or accents opening by a hold play a click
+     * (with Haptics on). Off by default. */
+    var holdClick: Boolean
+        get() = prefs.getBoolean("holdClick", false)
+        set(value) { prefs.edit().putBoolean("holdClick", value).apply() }
     /** The hold that starts a dictation, from [holdDelay]: 350 ms at the default 300. */
     val talkHold: Long get() = maxOf(TALK_HOLD_FLOOR, holdDelay + 50).toLong()
     /** Keyboard › Delete words when held: how much sooner each word goes than the one before, in percent. */

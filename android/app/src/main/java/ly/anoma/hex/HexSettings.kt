@@ -243,6 +243,7 @@ internal fun HexSettings(setup: Setup, speech: SpeechPreferences, typing: Typing
     val swiftKeyLayout = remember(revision) { typing.swiftKeyLayout }
     val shiftRecases = remember(revision) { typing.shiftRecases }
     val holdDelay = remember(revision) { typing.holdDelay }
+    val holdClick = remember(revision) { typing.holdClick }
     val numberRow = remember(revision) { typing.numberRow }
     val snugBottom = remember(revision) { typing.snugBottom }
     val holdDeleteWords = remember(revision) { typing.holdDeleteWords }
@@ -652,6 +653,9 @@ internal fun HexSettings(setup: Setup, speech: SpeechPreferences, typing: Typing
                             Card {
                                 SettingSlider(stringResource(R.string.hold_delay), holdDelay, TypingPreferences.HOLD_DELAY_RANGE, step = 25,
                                     label = { context.getString(R.string.delete_word_first_ms, it) }, change = { typing.holdDelay = it })
+                                Rule()
+                                Toggle(stringResource(R.string.hold_click), stringResource(R.string.hold_click_detail),
+                                    holdClick) { typing.holdClick = it }
                                 Rule()
                                 Toggle(stringResource(R.string.letter_symbols), stringResource(R.string.letter_symbols_detail),
                                     letterSymbols) { typing.letterSymbols = it }

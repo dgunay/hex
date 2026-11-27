@@ -209,6 +209,8 @@
     <string name="signature_too_long">Use 200 characters or fewer</string>
     <string name="keyboard_tab">Tab</string>
     <string name="hold_delay">Hold delay</string>
+    <string name="hold_click">Click when a hold opens</string>
+    <string name="hold_click_detail">A small click as a held key’s symbols or accents appear (with Haptics on)</string>
     <string name="swiftkey_layout">SwiftKey layout</string>
     <string name="swiftkey_layout_detail">Microsoft SwiftKey’s symbols when you hold a letter, its bottom row with emoji before the comma, and its period popup</string>
     <string name="shift_recases">Shift changes a word’s case</string>

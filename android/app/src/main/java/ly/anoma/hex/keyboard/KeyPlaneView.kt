@@ -786,7 +786,12 @@ internal class KeyPlaneView(context: Context, private val ime: HexKeyboard, priv
                     if (shown != null && ime.feedback.popups && ime.previewAllowed) feedback.present(k.face, listOf(shown))
                     val options = holds()
                     if (options.firstOrNull().isNullOrEmpty().not()) {
-                        pendingAccents = Runnable { if (v.isPressed) feedback.hold(k.face, options, default()) }
+                        pendingAccents = Runnable {
+                            if (!v.isPressed) return@Runnable
+                            // Labs › Keyboard › Click when a hold opens: a hold clicks as its options open; a flick doesn't.
+                            if (!flicking && ime.feedback.holdClick) tap(context, ime.feedback.haptics, Tap.Press)
+                            feedback.hold(k.face, options, default())
+                        }
                         postDelayed(pendingAccents!!, ime.feedback.holdDelay.toLong())
                     }
                 }
@@ -794,7 +799,7 @@ internal class KeyPlaneView(context: Context, private val ime: HexKeyboard, priv
                     if (swipes && strokeMoved(k, e)) return@setOnTouchListener true
                     // A flick: the held options open now, under the finger, which already picks among them.
                     if (!feedback.choosing && v.isPressed && flicks() && abs(e.x - downX) > slop)
-                        pendingAccents?.let { removeCallbacks(it); it.run() }
+                        pendingAccents?.let { removeCallbacks(it); flicking = true; it.run(); flicking = false }
                     if (feedback.choosing && v.isPressed) { val (x, y) = inHost(v, e); feedback.move(x, y) }
                     else if (e.x < -slop || e.x > v.width + slop || e.y < -slop || e.y > v.height + slop) {
                         if (v.isPressed) clearCallout()
@@ -1044,6 +1049,8 @@ internal class KeyPlaneView(context: Context, private val ime: HexKeyboard, priv
         super.onLayout(changed, l, t, r, b)
         if (changed) grid = null
     }
+    /** A flick is opening the held options: no hold click. */
+    private var flicking = false
     fun clearCallout() {
         pendingAccents?.let(::removeCallbacks); pendingAccents = null; feedback.clear()
     }

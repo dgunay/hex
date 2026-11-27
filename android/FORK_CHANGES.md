@@ -75,6 +75,17 @@ Each setting's commits still use the names it had when it was added. Commit hash
   delay).
 - **Commit:** `d0ddec12` Android Keyboard: Hold delay (Labs).
 
+### Click when a hold opens (Labs)
+
+- **Setting:** Labs › Keyboard › Click when a hold opens, off by default; needs Keyboard › Haptics on.
+- **What:** a click (the key press's own) the moment a held key's symbols or accents appear, so you feel that the
+  hold took. Before, a hold played nothing until the key lifted.
+- **Why:** asked for: "when long press to do a symbol happens can there be a small haptic click? right now its
+  nothing".
+- **How:** the hold's timer in `KeyPlaneView.typesOnLift` plays `Tap.Press` before `LetterFeedback.hold`.
+- **Limits:** a flick (SwiftKey layout's period, or sliding off a key) opens the options at once without a click,
+  since the finger is already moving. The Hex key's and the space bar's holds are unchanged.
+
 ### SwiftKey layout (Labs)
 
 ![Held A types @, held T types 5, a flick right off the period types ?, then the 123 and {&= pages](docs/fork-demos/swiftkey-layout.gif)
