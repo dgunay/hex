@@ -59,6 +59,8 @@
     <string name="keyboard_letters">Letters</string>
     <string name="keyboard_emoji">Emoji</string>
     <string name="keyboard_menu_mark_problem">Mark a problem</string>
+    <string name="keyboard_note_hint">What went wrong? (optional)</string>
+    <string name="keyboard_note_done">Keep the note</string>
     <string name="keyboard_emoji_search">Search emoji</string>
     <string name="keyboard_emoji_search_back">Back to emoji</string>
     <string name="keyboard_emoji_search_none">No emoji found</string>
