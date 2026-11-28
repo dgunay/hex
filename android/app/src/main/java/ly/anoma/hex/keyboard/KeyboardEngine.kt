@@ -710,6 +710,10 @@ internal class KeyboardEngine(
     /** Labs › Keyboard › Learn new words: [typed], kept as typed after [before], joins the personal dictionary when no
      * dictionary knows it. Only in a field Hex may learn from that reads words with a model of its own: never a
      * password, URL or incognito field, nor a stand-in's keys. */
+    /** Labs › Keyboard › Learn new words: whether [text], shown in the strip, is one of your own words, which a long
+     * press offers to remove. */
+    fun ownsWord(text: String) = feedback.learnWords && word?.decoder?.personal?.owns(text) == true
+
     private fun learn(w: TypingWord, typed: String, before: String) {
         val add = learnWord ?: return
         if (!LearnedWords.allowed(feedback.learnWords, secure, exactField, keyEventEditor, learnsTyping, w.standIn)) return

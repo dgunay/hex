@@ -548,6 +548,22 @@ class HexKeyboard : InputMethodService() {
             }
         }
     }
+    /** Labs › Keyboard › Learn new words: a long press on one of your words in the strip offers to take it out. */
+    internal fun offerForget(word: String) {
+        view?.notice(StripNotice(getString(R.string.keyboard_word_forget, word), getString(R.string.keyboard_note_dismiss),
+            tap = { forgetWord(word) }, dismiss = {}))
+    }
+    /** Takes [word] out of Android's personal dictionary in every language and, when Labs › Keyboard › SwiftKey words
+     * brought it in, out of the imported list too. */
+    private fun forgetWord(word: String) {
+        words.execute {
+            runCatching { contentResolver.delete(UserDictionary.Words.CONTENT_URI, "${UserDictionary.Words.WORD} = ? COLLATE NOCASE", arrayOf(word)) }
+            added.removeAll { it.substringAfter(':') == word.lowercase() }
+            val imported = ImportedWords.read(this)
+            val kept = imported.filterNot { it.equals(word, ignoreCase = true) }
+            if (kept.size != imported.size) runCatching { ImportedWords.save(this, kept) }
+        }
+    }
     /** A swipe in a dictation language without a typing model types nothing: the strip names the language until typing
      * starts, a tap or its ✕ (in place of Hex Preview's update line, which comes back in the next field). */
     private fun swipeUnavailable() {

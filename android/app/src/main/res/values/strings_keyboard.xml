@@ -27,6 +27,7 @@
     <!-- Labs › Keyboard › Learn new words: a spelling kept as typed joined the personal dictionary; tapping the line
          takes it out again. %1$s is the word. -->
     <string name="keyboard_note_learned">Added “%1$s” to your dictionary. Tap to remove</string>
+    <string name="keyboard_word_forget">Tap to remove “%1$s” from your dictionary</string>
     <!-- Labs › Faster English dictation: a shortage of memory sent an English dictation to the standard model. At most
          once a day. -->
     <string name="keyboard_note_low_memory">Low on memory: used standard dictation.</string>
