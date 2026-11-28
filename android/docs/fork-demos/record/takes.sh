@@ -34,12 +34,6 @@ fix-earlier-words)
   take() { $S/clear.sh; sleep 0.5; $S/type.sh "i want to by a car "; sleep 1.2; $S/tap.sh 350 1422 80; sleep 1.6; $S/tap.sh 430 1572 90; sleep 2.5; }; export -f take
   ./prefs.sh autocorrect=true fixEarlierWords=true; field; ./rec.sh earlier 14 take
   gif fix-earlier-words.gif raw/earlier --start 2.2 --end 11.5 ;;
-learn-new-words)
-  # "tailscale" must not be in the dictionary yet: long-press it in the strip and tap the notice to remove it.
-  take() { $S/clear.sh; sleep 0.5; $S/type.sh "restart tailscale "; sleep 1.4; $S/tap.sh 966 2025 90; sleep 2.2
-           $S/type.sh " then ping tailscale "; sleep 2.8; }; export -f take
-  ./prefs.sh autocorrect=true learnWords=true strongAutocorrect=true; field; ./rec.sh learn 18 take
-  gif learn-new-words.gif raw/learn --start 1.9 --end 15 --top 1285 ;;
 emoji-shortcodes)
   take() { $S/clear.sh; sleep 0.5; $S/type.sh "this is "; colon; $S/type.sh "fire"; sleep 1.3; $S/tap.sh 430 1572 90; sleep 1.0
            $S/type.sh "lets get "; colon; $S/type.sh "piz"; sleep 1.3; $S/tap.sh 640 1572 90; sleep 2.8; }; export -f take
@@ -55,11 +49,6 @@ mark-a-problem)
            $S/type.sh "the strip pick did nothing"; sleep 1.2; $S/tap.sh 1020 1452 90; sleep 1.0; $S/type.sh "ok"; sleep 2.8; }; export -f take
   ./prefs.sh autocorrect=true typingLog=true; field; ./rec.sh note 22 take
   gif mark-a-problem.gif raw/note --start 2.2 --end 19 --top 1230 ;;
-swiftkey-layout)
-  take() { $S/clear.sh; sleep 0.6; $S/type.sh "see you "; sleep 0.3; $S/tap.sh 111 1872 750; sleep 0.5; $S/type.sh " "; $S/tap.sh 486 1719 750; sleep 0.6
-           $S/slide.sh 864 2178 975 2178 8; sleep 1.4; $S/tap.sh 84 2178; sleep 1.6; $S/tap.sh 84 2024; sleep 1.6; $S/tap.sh 84 2180; sleep 2.2; }; export -f take
-  ./prefs.sh autocorrect=true swiftKeyLayout=true; field; ./rec.sh swiftkey 18 take
-  gif swiftkey-layout.gif raw/swiftkey --start 1.9 --end 15 ;;
 remove-bottom-margin)
   F=/usr/share/fonts/noto/NotoSans-Medium.ttf
   for v in false true; do

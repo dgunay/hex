@@ -58,45 +58,6 @@ Each setting's commits still use the names it had when it was added. Commit hash
   delay).
 - **Commit:** `d0ddec12` Android Keyboard: Hold delay (Labs).
 
-### SwiftKey layout (Labs)
-
-![Held A types @, held T types 5, a flick right off the period types ?, then the 123 and {&= pages](docs/fork-demos/swiftkey-layout.gif)
-
-- **Switch:** Labs › Keyboard › SwiftKey layout (off).
-- **What:** Microsoft SwiftKey's arrangement (English QWERTY, Android), for muscle memory carried over from it
-  (anomalyco/hex#2748, closed upstream without a change):
-  - **Held letters:** SwiftKey's symbols, shown as key hints, whether or not Symbols on letter keys is on:
-
-    ```text
-    q w e r t y u i o p    % ^ ~ | [ ] < > { }   (only beside the Number row; otherwise the digits)
-    a s d f g h j k l      @ # & * - + = ( )
-    z x c v b n m          _ $ " ' : ; /
-    ```
-
-  - **Bottom row:** ?123, emoji, comma, space, period, enter (the emoji key before the comma).
-  - **Held period:** one row, `! , . ?`, with the period selected.
-    A sideways slide opens it at once, with no wait for the hold, and the finger already picks: a flick one key
-    left types `,`, two `!`, one right `?`.
-  - **Held comma:** on the letters, a dictation as the Hex key held starts one (after 350 ms), finished when the comma
-    lifts; it types no comma. SwiftKey's comma holds its voice typing. A microphone in its corner says so
-    (`KeyCap.hintIcon`), as SwiftKey's does.
-  - **123 page:** digits; `@ # $ & _ - ( ) = %`; then `{&=`, `" * ' : / ! ? +` and delete. Its bottom row
-    has no emoji key: ABC, comma, a wider space, period, enter.
-  - **{&= page:** `£ € ¥ ¢ © ® ™ ~ ¿`; Tab, `[ ] { } < > ^ ¡`; then 123, `` ` ; ÷ \ | ¦ ¬ `` and delete; and
-    ABC, space, `× § ¶ °`, enter.
-- **How:** `LetterFeedback.letterSymbol(swiftKey)`, `KeyboardLetters.swiftKeyNumbers`/`swiftKeySymbols`, and
-  `KeyPlaneView.layBottom`, which moves and hides the bottom row's keys in place (`KeyRowLayout.place`, gone keys
-  take no room) so a finger already on ?123 keeps its press. Tab types a tab character.
-- **Limits:**
-  - Taken from screenshots of SwiftKey on one phone; the symbol pages' keys aren't sized exactly as SwiftKey's.
-  - A local currency (Labs) takes $'s place on x and the 123 page, and $ takes its slot on {&=, as on Gboard's
-    pages.
-- **Commits:**
-  - `ca3dea84` Android Keyboard: SwiftKey layout (Labs)
-  - `4cf44411` Android Keyboard: SwiftKey layout's held comma dictates
-  - `8ed355c2` Android Keyboard: SwiftKey layout's period flicks to its punctuation
-  - `a33ba194` Android Keyboard: SwiftKey layout's comma shows a microphone
-
 ### Shift changes a word's case (Labs)
 
 ![Shift taps turn "sf" into "Sf" and then "SF"](docs/fork-demos/shift-recase.gif)
@@ -218,43 +179,17 @@ These are listed with their features; the bugs aren't in upstream's code.
   Most of what's still missed has no reading within one edit (two typos, names). The taps are synthetic, not
   recorded.
 
-### Learn new words
+### Learn new words, more ways (Labs)
 
-!["tailscale" corrected to "tail scale", undone with delete and added to the dictionary, then kept when typed again](docs/fork-demos/learn-new-words.gif)
-
-- **Switch:** Settings › Keyboard › Learn new words (off).
-- **What:** as SwiftKey does, a word you keep the way you typed it joins your personal dictionary, so autocorrect
-  leaves it alone and suggests it from then on. You keep a word by:
-  - tapping your own spelling (in quotes) in the suggestion strip,
-  - undoing an autocorrection of it, with Delete or the Undo tool, or
-  - choosing what you first typed in Fix earlier words.
-
-  The strip then says `Added “gunay” to your dictionary. Tap to remove`. Long-pressing one of your dictionary's
-  words in the strip offers `Tap to remove “gunay” from your dictionary`.
-- **Why:** upstream reads Android's personal dictionary but never adds to it. A name or product the model doesn't
-  know ("gunay", "tailscale") is "corrected" every time until it's added by hand in Android's settings, and
-  Stronger autocorrect splits such words more readily. Once a word is in the dictionary, both leave it alone.
-- **How:**
-  - `LearnedWords.learnable`: only a spelling no dictionary knows. It must be 2–32 characters, start and end with a
-    letter, and contain only letters, apostrophes and hyphens. It must not be the model's word (`index`/`known`)
-    or already yours.
-  - `LearnedWords.spelling`: a capital that only the start of a sentence gave the word isn't kept ("Tailscale is…"
-    is saved as "tailscale"). Capitals inside a word ("iPhone") or mid-sentence ("Gunay") are kept.
-  - It's written with `UserDictionary.Words.addWord` (frequency 250, as Android's own Add uses) under the
-    language's locale, off the main thread. A keyboard that's the current input method may write the dictionary
-    without a permission.
-  - Upstream's existing content observer reloads every model's personal words when the dictionary changes.
-  - Removing deletes the dictionary rows with that word (`word = ? COLLATE NOCASE`).
-  - Removing also takes the word out of upstream's Labs › Keyboard › SwiftKey words list, if it came from there.
-- **Limits:**
-  - Never in password fields, or fields that ask not to be learned from (incognito).
-  - A word you simply type and keep, without tapping it or undoing a fix, isn't learned. Hex keeps no record of
-    what you type, so it can't count repeats the way SwiftKey does.
-  - Words go into Android's shared personal dictionary, so other keyboards and spell checkers see them too.
-- **Commits:**
-  - Android Keyboard: Learn new words, as SwiftKey learns them
-  - `b416e443` Android Keyboard: removing a learned word also clears it from SwiftKey words
-  - `69b81440` Android Keyboard: Learn new words' description fits its two lines
+- **Setting:** upstream's Labs › Keyboard › Learn new words, which learns a word when you tap it as typed or keep it
+  after undoing its fix. With it on, this fork adds:
+  - **Long-press to remove:** long-pressing one of your own words in the strip (or in More suggestions' scroll)
+    offers `Tap to remove “gunay” from your dictionary`. That also takes it out of Labs › Keyboard › SwiftKey words if
+    it came from there.
+  - **Fix earlier words:** choosing what you first typed there learns it, as tapping it in the strip does.
+- **How:** `KeyboardEngine.ownsWord` (your personal words), `HexKeyboard.offerForget`/`forgetWord` (deletes the
+  dictionary rows `COLLATE NOCASE`, in every language), and Fix earlier words' pick calls upstream's `learn`.
+- **Commit:** Android Keyboard: Learn new words, long-press removal and Fix earlier words.
 
 ### Neural autocorrect (Labs)
 
@@ -471,6 +406,15 @@ upstream's. Where upstream's differs from what the fork had:
   while the word is typed and lays an unknown word out with what was typed on the left before the pause, as the fork
   did. It also keeps what was typed on the left once it showed for that word, even when the pause finds no fix.
   More suggestions stays the fork's own.
+- **SwiftKey layout** (#3028): Labs › Keyboard › SwiftKey layout, the same symbols, bottom row, pages, one-row period
+  with its flicks, and the comma's held dictation with a microphone hint. The comma's dictation hold follows this
+  fork's Hold delay.
+- **Learn new words** (#3030): now Labs › Keyboard, off (the fork's was in Settings › Keyboard). An undone fix is
+  learned only once that same word ends unchanged (space or a closing mark), so holding Delete never teaches a typo;
+  the fork's learned it at the undo. Words must use only the language's own letters (no hyphens). The fork keeps
+  [its extras](#learn-new-words-more-ways-labs).
+- **Delete words when held's timing sliders** (#3033): Initial delay and Acceleration, the fork's ranges and
+  defaults, under upstream's own setting names, so a level set in the fork doesn't carry over.
 - **Dictation sounds** (#3024): the same seven sets, cues and zeroed start, Labs › Dictation › Dictation sounds, off;
   upstream packs desktop's own WAVs at build time instead of copies. It had no volume; the fork keeps that as
   [Dictation sounds volume](#dictation-sounds-volume-labs).
