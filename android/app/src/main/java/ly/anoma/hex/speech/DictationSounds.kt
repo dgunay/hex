@@ -84,6 +84,9 @@ internal object DictationSounds {
     private class Waiting(val played: ((Long?) -> Unit)?, val wanted: () -> Boolean)
     private val waiting = HashMap<Int, Waiting>()
     private var startGuardMs = 0L
+    /** The Sound page's Volume (Labs › Dictation sounds), as the raw scalar SoundPool takes: the System volume's level
+     * at 100%, every 10% below it 3 dB quieter, as Key click volume's slider. */
+    private var volume = 1f
     private val main = Handler(Looper.getMainLooper())
 
     /** Before a dictation: loads the chosen set when the lab is on and returns how long to zero the recording's start
@@ -91,6 +94,7 @@ internal object DictationSounds {
     fun prepare(context: Context): Long? {
         val prefs = SpeechPreferences(context)
         if (!prefs.dictationSounds) { release(); return null }
+        volume = ly.anoma.hex.keyboard.KeyClick.scalar(prefs.soundVolume)
         load(context, prefs.soundSet)
         return startGuardMs + START_GUARD_EXTRA_MS
     }
@@ -103,7 +107,7 @@ internal object DictationSounds {
         val id = ids[cue]
         when {
             pool == null || id == null -> played?.invoke(null)
-            id in loaded -> { pool.play(id, 1f, 1f, 1, 0, 1f); played?.invoke(SystemClock.uptimeMillis()) }
+            id in loaded -> { pool.play(id, volume, volume, 1, 0, 1f); played?.invoke(SystemClock.uptimeMillis()) }
             else -> {
                 waiting.remove(id)?.played?.invoke(null)
                 val wait = Waiting(played, wanted)
@@ -117,10 +121,19 @@ internal object DictationSounds {
     /** The sound picker: a short dictation in [set], start, stop and done, at desktop Hex's moments. */
     fun audition(context: Context, set: SoundSet) {
         main.removeCallbacksAndMessages(this)
+        volume = ly.anoma.hex.keyboard.KeyClick.scalar(SpeechPreferences(context).soundVolume)
         load(context, set)
         play(SoundCue.Start)
         main.postAtTime({ play(SoundCue.Stop) }, this, SystemClock.uptimeMillis() + 1_400)
         main.postAtTime({ play(SoundCue.Done) }, this, SystemClock.uptimeMillis() + 2_100)
+    }
+
+    /** The Volume slider moved: [set]'s stop sound once, at the new level. */
+    fun preview(context: Context, set: SoundSet) {
+        main.removeCallbacksAndMessages(this)
+        volume = ly.anoma.hex.keyboard.KeyClick.scalar(SpeechPreferences(context).soundVolume)
+        load(context, set)
+        play(SoundCue.Stop)
     }
 
     fun release() {
@@ -147,7 +160,7 @@ internal object DictationSounds {
             // A sound asked for while it loaded still plays: it is at most SOUND_WAIT_MS late, else it was dropped.
             waiting.remove(id)?.let {
                 if (!it.wanted()) { it.played?.invoke(null); return@let }
-                loading.play(id, 1f, 1f, 1, 0, 1f); it.played?.invoke(SystemClock.uptimeMillis())
+                loading.play(id, volume, volume, 1, 0, 1f); it.played?.invoke(SystemClock.uptimeMillis())
             }
         }
         pool = next; set = chosen

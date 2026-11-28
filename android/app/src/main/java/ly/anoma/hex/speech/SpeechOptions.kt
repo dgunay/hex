@@ -244,6 +244,10 @@ internal class SpeechPreferences(private val context: Context) {
     var soundSet: SoundSet
         get() = SoundSet.matching(prefs.getString("soundSet", null))
         set(value) { prefs.edit().putString("soundSet", value.name).apply() }
+    /** Dictation sounds' Volume, in percent of the System volume's level (5–100, 100 to start). */
+    var soundVolume: Int
+        get() = prefs.getInt("soundVolume", 100).coerceIn(5, 100)
+        set(value) { prefs.edit().putInt("soundVolume", value.coerceIn(5, 100)).apply() }
     fun options(nextEnglish: Boolean?): SpeechOptions {
         val translated = translation && translatable && (nextEnglish ?: true)
         // A translated dictation is English the model wrote: nothing learned applies to it, and it hints nothing.

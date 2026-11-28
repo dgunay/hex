@@ -1,10 +1,19 @@
 package ly.anoma.hex
 
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import ly.anoma.hex.speech.DictationSounds
 import ly.anoma.hex.speech.SoundSet
+import ly.anoma.hex.speech.SpeechPreferences
 
 /** A sound set's name, desktop Hex's English names. */
 internal val SoundSet.label get() = when (this) {
@@ -41,10 +50,19 @@ private val SoundSet.character get() = when (this) {
     }
 }
 
-/** The Sound page: desktop Hex's seven sets in its order. A tap chooses the set and plays a short dictation in it, and
- * the page stays open to try another, as desktop's picker does. */
+/** The Sound page: the sounds' Volume, then desktop Hex's seven sets in its order. A tap chooses the set and plays a
+ * short dictation in it, and the page stays open to try another, as desktop's picker does. Moving Volume plays the
+ * chosen set's stop sound once per step. */
 @Composable internal fun SoundSetPage(chosen: SoundSet, choose: (SoundSet) -> Unit) {
     val context = LocalContext.current
+    val speech = remember { SpeechPreferences(context) }
+    var volume by remember { mutableIntStateOf(speech.soundVolume) }
+    Card {
+        SettingSlider(stringResource(R.string.dictation_sound_volume), volume, 5..100, step = 5, last = true) {
+            if (it != volume) { volume = it; speech.soundVolume = it; DictationSounds.preview(context, chosen) }
+        }
+    }
+    Spacer(Modifier.height(16.dp))
     Card {
         SoundSet.entries.forEachIndexed { i, it ->
             if (i != 0) Rule()

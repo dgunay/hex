@@ -422,6 +422,7 @@
     <string name="dictation_sounds">Dictation sounds</string>
     <string name="dictation_sounds_detail">A sound when Hex starts listening, when you finish, when you cancel and when a dictation fails, and another when slow text arrives. Silent and vibrate mute them.</string>
     <string name="dictation_sound">Sound</string>
+    <string name="dictation_sound_volume">Volume</string>
     <string name="sound_set_classic">Classic keys</string>
     <string name="sound_set_classic_detail">Two clicks to start, a swish to stop</string>
     <string name="sound_set_signature">Kalimba</string>

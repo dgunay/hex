@@ -432,24 +432,16 @@ These are listed with their features; the bugs aren't in upstream's code.
 
 ## Dictation
 
-### Dictation sounds (Labs)
+### Dictation sounds volume (Labs)
 
-- **Switch:** Labs › Dictation › Dictation sounds (off). On, a Sound row picks the set: desktop Hex's seven, in its
-  order and with its names (Classic keys first and chosen, as on desktop, then Kalimba, Click, Soft tone, Wood,
-  Warm synth, Thock). Picking one plays its start and stop.
-- **What:** a sound as the microphone opens, as you finish (✓, letting go of the Hex key, or the 1-minute stop),
-  when ✕ cancels, and when a dictation fails (no microphone, no model, couldn't transcribe). A text that goes in
-  2 s or more after the stop sound plays done, in the sets that have one. Nothing said ends quietly, as on desktop.
-  It works wherever Hex dictates: the keyboard, Home, the Quick Settings sheet and apps' speech requests.
-- **Why:** desktop Hex confirms each step with a sound; Android Hex was silent.
-- **How:** `DictationSounds` plays the sets' WAVs, copied from `resources/audio/sounds/` (Classic mixed down to
-  mono; 770 KB in all), through a `SoundPool` as system sounds (`USAGE_ASSISTANCE_SONIFICATION`), so silent and
-  vibrate modes quiet them and the System volume sets their level; the Sound page's Volume slider (5–100%,
-  100% to start, as Key click volume's: every 10% is 3 dB less) sets theirs below it. `MicCapture` plays each cue. The start sound
-  plays as recording begins, and the samples recorded until it ends, plus 120 ms, are zeroed, so it is never taken
-  for speech or transcribed. Off, nothing is loaded.
-- **Limits:** the first start after the lab turns on can be silent while its set loads.
-- **Commit:** Android: Dictation sounds, desktop Hex's sound sets (Labs).
+- **Setting:** Labs › Dictation sounds › Sound › Volume, 5–100% in steps of 5 (100% to start). It shows on the Sound
+  page above the sets while Dictation sounds is on.
+- **What:** upstream's Dictation sounds play at the System volume's level; the slider sets them below it. Moving it plays
+  the chosen set's stop sound once per step.
+- **How:** `DictationSounds` plays at `KeyClick.scalar(percent)`, Key click volume's curve (every 10% is 3 dB less),
+  read as each dictation starts and on each audition. The setting is `soundVolume`, the same key the fork's own
+  Dictation sounds used, so a level set there carries over.
+- **Commit:** Android: Dictation sounds volume (Labs).
 
 ## Dropped because upstream built it
 
@@ -479,6 +471,9 @@ upstream's. Where upstream's differs from what the fork had:
   while the word is typed and lays an unknown word out with what was typed on the left before the pause, as the fork
   did. It also keeps what was typed on the left once it showed for that word, even when the pause finds no fix.
   More suggestions stays the fork's own.
+- **Dictation sounds** (#3024): the same seven sets, cues and zeroed start, Labs › Dictation › Dictation sounds, off;
+  upstream packs desktop's own WAVs at build time instead of copies. It had no volume; the fork keeps that as
+  [Dictation sounds volume](#dictation-sounds-volume-labs).
 - **Voice-only mode answers apps' speech requests, and the Android 17 hand-back** (#3027): now its own lab, Labs ›
   Keyboard › Answer apps' speech requests, off; the fork's came on with Voice-only mode. The same sheet and the same
   hand-back timing (insets plus 50 ms, at most 400 ms). The activity has a new name, so the choice of which app
