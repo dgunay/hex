@@ -9,6 +9,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
+import kotlin.math.roundToInt
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
@@ -612,7 +613,7 @@ internal fun HexSettings(setup: Setup, speech: SpeechPreferences, typing: Typing
                                 mod = Modifier.padding(start = 16.dp))
                             Card {
                                 SettingSlider(stringResource(R.string.hold_delay), holdDelay, TypingPreferences.HOLD_DELAY_RANGE, step = 25,
-                                    label = { context.getString(R.string.delete_word_first_ms, it) }, change = { typing.holdDelay = it })
+                                    label = { context.getString(R.string.hold_delay_ms, it) }, change = { typing.holdDelay = it })
                                 Rule()
                                 Toggle(stringResource(R.string.letter_symbols), stringResource(R.string.letter_symbols_detail),
                                     letterSymbols) { typing.letterSymbols = it }
@@ -667,6 +668,7 @@ internal fun HexSettings(setup: Setup, speech: SpeechPreferences, typing: Typing
                                 Rule()
                                 Toggle(stringResource(R.string.closing_quote_takes_space), stringResource(R.string.closing_quote_takes_space_detail),
                                     closingQuoteTakesSpace) { typing.closingQuoteTakesSpace = it }
+                                Rule()
                                 Toggle(stringResource(R.string.more_suggestions), stringResource(R.string.more_suggestions_detail),
                                     moreSuggestions) { typing.moreSuggestions = it }
                                 Rule()
@@ -878,6 +880,27 @@ private fun reflow(lines: List<String>) = buildString {
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         RowTitle(title, note, noteLines, titleLines)
         if (action != null && value.isNotEmpty()) Label(value, muted = true, size = if (value == "›") 22 else 15)
+    }
+}
+/** A slider in a settings card over [range] in steps of [step], its value shown as [label] puts it, calling [change]
+ * as it moves. Hex's own colours, Material's slider for touch and TalkBack. [indented] sets it under the switch above
+ * it as one of that switch's own settings (no rule between them); [last] gives the group its bottom space back. */
+@Composable internal fun SettingSlider(title: String, value: Int, range: IntRange, step: Int = 10, indented: Boolean = false,
+                                       last: Boolean = false, label: (Int) -> String = { "$it%" }, finished: (() -> Unit)? = null,
+                                       change: (Int) -> Unit) {
+    var shown by remember(value) { mutableIntStateOf(value) }
+    Column(Modifier.fillMaxWidth().padding(start = if (indented) 40.dp else 16.dp, end = 16.dp,
+        top = if (indented) 0.dp else 10.dp, bottom = if (indented && last) 10.dp else 4.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.weight(1f)) { Label(title, weight = if (indented) FontWeight.Normal else FontWeight.Medium) }
+            Label(label(shown), muted = true, size = 15)
+        }
+        androidx.compose.material3.Slider(value = shown.toFloat(), valueRange = range.first.toFloat()..range.last.toFloat(),
+            steps = (range.last - range.first) / step - 1,
+            onValueChange = { shown = it.roundToInt(); change(shown) }, onValueChangeFinished = finished,
+            colors = androidx.compose.material3.SliderDefaults.colors(thumbColor = colorResource(R.color.ink),
+                activeTrackColor = colorResource(R.color.ink), inactiveTrackColor = colorResource(R.color.modifier),
+                activeTickColor = colorResource(R.color.modifier), inactiveTickColor = colorResource(R.color.ink)))
     }
 }
 @Composable internal fun Toggle(title: String, note: String?, on: Boolean, enabled: Boolean = true, noteLines: Int = 2,

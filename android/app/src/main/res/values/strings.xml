@@ -206,6 +206,7 @@
     <string name="signature_one_line">Use one line</string>
     <string name="signature_too_long">Use 200 characters or fewer</string>
     <string name="hold_delay">Hold delay</string>
+    <string name="hold_delay_ms">%1$d ms</string>
     <string name="shift_recases">Shift changes a word’s case</string>
     <string name="shift_recases_detail">Tap shift with the cursor at the end of a word to make it Title, then ALL CAPS, then lowercase, as on Microsoft SwiftKey. Hold shift and type for a capital as usual</string>
     <string name="letter_symbols">Symbols on letter keys</string>
@@ -223,8 +224,8 @@
     <string name="neural_timing_none">Type in English to try it. The first word loads the model.</string>
     <string name="neural_timing">%1$d words checked · typical %2$d ms · slow ones %3$d ms · %4$d too slow, left to the usual autocorrect</string>
     <string name="fix_earlier_words_detail">Go back into a word to see what else it could be, and what you first typed</string>
-    <string name="snug_bottom">Keys down to the bar</string>
-    <string name="snug_bottom_detail">No gap under the bottom row</string>
+    <string name="snug_bottom">Remove bottom margin</string>
+    <string name="snug_bottom_detail">Moves the bottom row of keys down to the navigation bar</string>
     <string name="local_currency">Local currency</string>
     <string name="local_currency_detail">Uses your region’s currency on the ?123 page and d’s held symbol instead of $</string>
     <string name="keyboard_tools">Keyboard tools</string>

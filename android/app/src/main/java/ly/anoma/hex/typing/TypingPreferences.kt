@@ -52,7 +52,7 @@ internal class TypingPreferences(context: Context) {
     var numberRow: Boolean
         get() = prefs.getBoolean(NUMBER_ROW, false)
         set(value) { prefs.edit().putBoolean(NUMBER_ROW, value).apply() }
-    /** Keyboard › Keys down to the bar: no gap under the bottom row, so the keys sit on the system's
+    /** Keyboard › Remove bottom margin: no gap under the bottom row, so the keys sit on the system's
      * bar. Off by default (Gboard's 12.2 dp gap). */
     var snugBottom: Boolean
         get() = prefs.getBoolean(SNUG_BOTTOM, false)
