@@ -31,18 +31,6 @@ Each setting's commits still use the names it had when it was added. Commit hash
   bar.
 - **Commit:** `639df77d` Android Keyboard: Keys down to the bar removes the gap under the bottom row.
 
-### Key click volume
-
-- **Switch:** Settings › Keyboard › Key click volume (off: the phone's own level, as before). On, a Volume slider
-  under it (5–100%, 50% to start) sets the level; while it is dragged a click repeats at a steady pace at the level shown.
-- **What:** the key click plays quieter than Android's own key sound.
-- **Why:** upstream plays the system's click at the level the phone chooses for it, and on a Galaxy that's louder
-  than other keyboards' clicks. Gboard has its own Volume on keypress.
-- **How:** `KeyCap` plays `AudioManager.playSoundEffect(sound, volume)` with the slider's scalar (`clickScalar`:
-  100% is full level, every 10% below is 3 dB less) instead of the level-less call. That call doesn't check Touch
-  sounds, so `click` reads the setting itself first. The System volume still scales it.
-- **Commit:** Android Keyboard: Key click volume.
-
 ### Steadier suggestion strip, and More suggestions (Labs)
 
 ![Typing "see you to", scrolling the strip past its three slots and picking "today"](docs/fork-demos/more-suggestions.gif)
@@ -74,17 +62,6 @@ Each setting's commits still use the names it had when it was added. Commit hash
 - **Limits:** the space bar's long press (the language menu) keeps Android's own delay (Accessibility › Touch & hold
   delay).
 - **Commit:** `d0ddec12` Android Keyboard: Hold delay (Labs).
-
-### Click when a hold opens (Labs)
-
-- **Setting:** Labs › Keyboard › Click when a hold opens, off by default; needs Keyboard › Haptics on.
-- **What:** a click (the key press's own) the moment a held key's symbols or accents appear, so you feel that the
-  hold took. Before, a hold played nothing until the key lifted.
-- **Why:** asked for: "when long press to do a symbol happens can there be a small haptic click? right now its
-  nothing".
-- **How:** the hold's timer in `KeyPlaneView.typesOnLift` plays `Tap.Press` before `LetterFeedback.hold`.
-- **Limits:** a flick (SwiftKey layout's period, or sliding off a key) opens the options at once without a click,
-  since the finger is already moving. The Hex key's and the space bar's holds are unchanged.
 
 ### SwiftKey layout (Labs)
 
@@ -154,66 +131,7 @@ Each setting's commits still use the names it had when it was added. Commit hash
 
 ## Fixes
 
-On for everyone. "Upstream too" means the bug is in code upstream also has, so the fix could be offered to them;
-"not checked" means that is read from the code, not yet reproduced on a plain upstream build.
-
-### English typing switched off by upstream's new model file
-
-- **What:** with upstream's English model update (#2973), English had no autocorrect, suggestions or swipe on the
-  phone: every letter typed as tapped.
-- **Why:** #2973 added `en.spellings` beside `en.hextm`, but not to the build's uncompressed files. The keyboard maps
-  its model files straight from the APK, which needs them stored uncompressed, so reading it failed, and the
-  editor's catch for unreadable assets quietly left typing off.
-- **How:** `spellings` joins `androidResources.noCompress` in `app/build.gradle.kts`.
-- **Upstream:** the same bug is on upstream's `dev`; worth a one-line PR there.
-
-### A comma after a picked word keeps the space after it
-
-- **What:** a strip word goes in with its space; a comma, period, ?, !, ;, : or ) typed next used to take that
-  space and leave none ("here," then a space by hand). The space now goes after the mark ("here, "), as Gboard does,
-  and a space typed next is swallowed as after a pick. The same goes for an autocorrection's space with Labs ›
-  Keyboard › Punctuation after autocorrect on. A URL field's marks still join ("github.").
-- **Why:** reported from the typing log (★ "I want a space after a comma here").
-- **How:** `SpaceRules.movesPickedSpace`; `KeyboardEngine.type` commits the mark with the space and keeps the
-  picked-space anchor after it.
-
-### Strip taps that did nothing where text follows the cursor
-
-- **What:** a tap on a strip word was silently ignored in three places, all where text follows the cursor:
-  - after a word the strip treats as finished with no space before the cursor, whether a pick held its space
-    ("up to‸ best") or you came back to the word ("you'll‸ soon"): the strip offered next words, but a tap only went
-    in where a space was already typed. Now it puts that space in first.
-  - after a pick that held its space, space did nothing and the next word joined the last ("up tobe"). Now the first
-    space keeps the held space for the next word, and a second one goes in.
-  - with a letter right after the cursor, as with Gmail's Smart Compose, whose grey suggestion is text in the field.
-    Now the word goes in with its space before that text.
-- **Why:** found in the typing log: 37 of one day's 120 strip taps did nothing.
-- **How:** one rule, `TypingWord.endsInWord`, decides both where the strip offers next words (`predictions`) and where
-  `KeyboardEngine.pickSuggestion` puts the space in first (`putSpace`, shared with `takeHeldSpace`).
-  `pickSuggestion` no longer returns when `canEndWord` is false. `space` swallows once at `heldAnchor`
-  (`heldSpaced`).
-- **Upstream too:** yes, not checked. The held space, the next-word strip and the `canEndWord` check are upstream's.
-- **Limits:** letters typed straight against the next word ("shapin‸the") still make one word, which the strip may
-  then correct as a whole.
-- **Commits:**
-  - `9eb39c51` Android Keyboard: Picks and spaces in the middle of text
-  - `8e1048fb` Android Keyboard: A next word tapped after a word puts its space in
-
-### A closing double quote takes the space before it
-
-![A closing quote typed after "see you soon " takes the space before it](docs/fork-demos/closing-quote.gif)
-
-- **What:** a `"` (or `”`) typed when a quote is open in the paragraph takes the space before it, whether a pick, an
-  autocorrection or you typed it: `"hello there "` then `"` is `"hello there"`. An opening quote keeps its space.
-- **Why:** reported: deleting the space before a closing quote by hand.
-- **How:** `SpaceRules.closesQuote`: an odd count of `"`, or more `“` than `”`, in the paragraph before the cursor
-  (up to 1,000 characters). `KeyboardEngine.type` lets it take the space as a clause mark takes a picked one.
-- **Upstream too:** yes. Upstream's marks take a picked space only for `,.!?;:)`.
-- **Limits:** on the standard layout `"` is on the ?123 page, and switching pages (`KeyboardEngine.mode`, upstream's)
-  forgets the space just typed, so a closing quote from there keeps it. On SwiftKey layout `"` is a held C, with no
-  page switch, and it works (the demo). Not fixed yet: keeping the space across a page switch would change
-  upstream's page switch for its other marks too.
-- **Commit:** `9eb39c51` Android Keyboard: Picks and spaces in the middle of text
+The fork's fixes to upstream's code are upstream now (see [Dropped because upstream built it](#dropped-because-upstream-built-it)).
 
 ### Fixes to this fork's own features
 
@@ -222,39 +140,6 @@ These are listed with their features; the bugs aren't in upstream's code.
 - Neural autocorrect: a read space gave up on leaves the model's queue (`405f13ed`); see Neural autocorrect.
 - Shift changes a word's case: the keys follow the recased word (`ad40800a`).
 - More suggestions: next words and an earlier word's words scroll past three too (`9eb39c51`).
-
-## Delete
-
-### Delete words when held
-
-![Holding delete with Delete words when held off and on](docs/fork-demos/delete-words.gif)
-
-- **Switch:** Settings › Keyboard › Delete words when held (off). While it's on, two sliders show under it:
-  - **Initial delay:** 200–1000 ms in steps of 50, 500 by default.
-  - **Acceleration:** 0–50% in steps of 5, 20 by default.
-- **What:** holding delete removes whole words, as SwiftKey's held delete does, starting gently and speeding up
-  the longer you hold ("the longer you hold it, the faster it deletes"). A tap still deletes one letter.
-- **Why:** deleting a sentence letter by letter at the 50 ms repeat rate either overshoots or takes too long.
-  Word steps that speed up are easier to stop on the right word.
-- **How:**
-  - Delete still waits the usual 400 ms hold threshold (`DELETE_REPEAT_DELAY`, shared with letter repeat). Then it
-    takes a word at once: no letters first.
-  - Each next word waits the previous gap times `1 − Acceleration`, starting from Initial delay, down to a floor of
-    90 ms (`DELETE_WORD_FASTEST`). With the defaults: 500, 400, 320, 256… ms.
-  - A "word" is what upstream's delete slide already takes: the word before the cursor plus the spaces and
-    punctuation after it (`DeleteSlide.wordLengths`), deleted with `deleteSurroundingText`.
-  - Each word plays `EFFECT_HEAVY_CLICK`, a stronger tap than a letter's, so you can count words by feel. It is
-    played only while Haptics is on.
-  - The settings are read when delete goes down, so changes apply on the next press.
-- **Limits:** password fields, `TYPE_NULL` editors (terminals), a selection, or an unknown cursor position can't
-  be read as words, so there it repeats letters as before.
-- **Commits:**
-  - `0a7180cc` Android Keyboard: Hold delete for words, as SwiftKey's held delete does
-  - `ebfb41a3` Android Keyboard: Hold delete for words takes only words, each with a heavy click
-  - `b24e58b7` Android Keyboard: Hold delete for words starts slower; Diagnostics names its tap
-  - `01f2486b` Android Keyboard: Hold delete for words waits 500 ms for the second word
-  - `83a4a823` Android Keyboard: Delete words when held's sliders sit indented under it
-  - `fc7598bb` Android Keyboard: Hold delete for words' First wait and Speed-up
 
 ## Autocorrect
 
@@ -632,9 +517,25 @@ These are listed with their features; the bugs aren't in upstream's code.
 - **A clause mark takes autocorrect's space** ("keyboadr", space, "." gave "keyboard." instead of "keyboard .").
   Upstream added the same behaviour as Labs › Keyboard › Punctuation after autocorrect (#2814, off by default), so
   this fork dropped its own always-on version and uses upstream's lab.
-- **Haptic strength** (a 10–100% slider for key taps). Removed from the fork as unneeded. Hold delete's heavier
-  per-word tap stayed. (`2d15ceca` Android Keyboard: Haptic strength slider under Haptics; `d2d592b1` Android
-  Keyboard: drop Haptic strength; plainer names for two settings.)
+- **Haptic strength** (a 10–100% slider for key taps). Removed from the fork as unneeded.
+
+Upstream merged these from this fork's issues on 2026-11-28; the fork dropped its own commits for them and uses
+upstream's. Where upstream's differs from what the fork had:
+
+- **English typing with `en.spellings`** (#2999): the same one-word fix.
+- **Delete words when held** (#3015): now Labs › Keyboard, off. The timings are fixed at the fork's defaults
+  (500 ms to the second word, each next 20% sooner, never under 90 ms); the fork's Initial delay and Acceleration
+  sliders are gone.
+- **Key click volume** (#3014): now Labs › Keyboard, off. Same 5–100% slider and 3 dB per 10%; dragging it plays one
+  click per 5% step instead of a steady repeating click.
+- **Click when a hold opens** (#3013): the same, and it also clicks when a flick opens the options at once (SwiftKey
+  layout's period), which the fork's didn't.
+- **Space after punctuation** (#3002): what the fork had as the always-on "A comma after a picked word keeps the
+  space after it" is now Labs › Keyboard › Space after punctuation, off.
+- **Closing quotes take the space** (#3012): now Labs › Keyboard, off (the fork's was always on). It works on the
+  standard layout too: it reads only the text, so the space survives the switch to ?123, which the fork's didn't.
+  It never takes a space right after the opening quote or one of several spaces.
+- **Strip taps that did nothing where text follows the cursor** (#3016): the same three cases, on for everyone.
 
 ## This fork's builds
 

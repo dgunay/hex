@@ -30,12 +30,6 @@ more-suggestions)
   take() { $S/clear.sh; sleep 0.5; $S/type.sh "see you to"; sleep 1.4; $S/slide.sh 790 1572 40 1572 16; sleep 1.3; $S/tap.sh 785 1572 90; sleep 2.5; }; export -f take
   ./prefs.sh autocorrect=true moreSuggestions=true; field; ./rec.sh more 14 take
   gif more-suggestions.gif raw/more --start 1.9 --end 11.5 ;;
-delete-words)
-  TXT="i think this message got a little too long so lets trim it down "
-  take() { sleep 1.2; $S/tap.sh 966 2025 2700; sleep 2.2; }; export -f take
-  ./prefs.sh autocorrect=false; field; ./clear.sh; ./type.sh "$TXT" 0.02; sleep 1.5; ./rec.sh del-off 7 take
-  ./prefs.sh autocorrect=false holdDeleteWords=true; field; ./clear.sh; ./type.sh "$TXT" 0.02; sleep 1.5; ./rec.sh del-on 7 take
-  gif delete-words.gif raw/del-off raw/del-on --labels "Delete words when held off" "Delete words when held on" --start 1.4 --end 7 --top 1285 ;;
 fix-earlier-words)
   take() { $S/clear.sh; sleep 0.5; $S/type.sh "i want to by a car "; sleep 1.2; $S/tap.sh 350 1422 80; sleep 1.6; $S/tap.sh 430 1572 90; sleep 2.5; }; export -f take
   ./prefs.sh autocorrect=true fixEarlierWords=true; field; ./rec.sh earlier 14 take
@@ -46,12 +40,6 @@ learn-new-words)
            $S/type.sh " then ping tailscale "; sleep 2.8; }; export -f take
   ./prefs.sh autocorrect=true learnWords=true strongAutocorrect=true; field; ./rec.sh learn 18 take
   gif learn-new-words.gif raw/learn --start 1.9 --end 15 --top 1285 ;;
-closing-quote)
-  # SwiftKey layout: " is a held C (on the standard layout the ?123 page's switch forgets the space).
-  take() { $S/clear.sh; sleep 0.5; $S/type.sh "she said "; sleep 0.2; $S/tap.sh 433 2025 600; sleep 0.4; $S/type.sh "see you soon "; sleep 1.4
-           $S/tap.sh 433 2025 600; sleep 2.8; }; export -f take
-  ./prefs.sh autocorrect=true swiftKeyLayout=true; field; ./rec.sh quote 15 take
-  gif closing-quote.gif raw/quote --start 1.9 --end 12 ;;
 emoji-shortcodes)
   take() { $S/clear.sh; sleep 0.5; $S/type.sh "this is "; colon; $S/type.sh "fire"; sleep 1.3; $S/tap.sh 430 1572 90; sleep 1.0
            $S/type.sh "lets get "; colon; $S/type.sh "piz"; sleep 1.3; $S/tap.sh 640 1572 90; sleep 2.8; }; export -f take
