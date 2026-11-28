@@ -354,21 +354,39 @@ internal class KeyboardEngine(
     private var recasing = false
     /** Shift locked because a tap made the word ALL CAPS: it goes off as the word ends. */
     private var wordLock = false
-    /** The word the cursor ends: the one being typed, else one in the field with nothing selected and no letter after
-     * the cursor. Null in a password field. */
-    private fun recasable(): String? {
+    /** The word the cursor ends: the one being typed, else one in the field with nothing selected. Null in a password
+     * field, or with the cursor before a word's first letter. */
+    private fun recasable(): String? = recaseSpan()?.let { (head, tail) -> head + tail }
+    /** [recasable]'s word split at the cursor: the part before it and, with the cursor inside a word ("a‸i"), the rest. */
+    private fun recaseSpan(): Pair<String, String>? {
         if (secure || !target.connected || selStart != selEnd || target.selected()?.isNotEmpty() == true) return null
-        if (target.after(1)?.firstOrNull()?.isLetter() == true) return null
+        if (target.after(1)?.firstOrNull()?.isLetter() == true) {
+            val head = WordCase.ending(before()) ?: return null
+            return head to WordCase.starting(target.after(40).orEmpty())
+        }
         val token = word?.token.orEmpty()
-        if (token.isNotEmpty() && endsWith(prefix + token)) return token
-        return WordCase.ending(before())
+        if (token.isNotEmpty() && endsWith(prefix + token)) return token to ""
+        return WordCase.ending(before())?.let { it to "" }
     }
     /** Shift tapped at a word: it goes to its next case, and stays as you cased it (space corrects it no more). */
     private fun recase() {
-        val old = recasable() ?: return
+        val (head, tail) = recaseSpan() ?: return
+        val old = head + tail
         val new = WordCase.next(old)
         logAfter { "recase ${TypingLog.q(old)} → ${TypingLog.q(new)}" }
         if (new == old) return
+        // Inside a word: the whole word changes around the cursor, which stays put; shift goes back off.
+        if (tail.isNotEmpty()) {
+            val at = selStart
+            if (at < head.length) return
+            shift.follow(false); wordLock = false; showPlane()
+            edited(); undo = null; clearSpaces(); resetTyping()
+            target.beginBatch()
+            try {
+                if (target.setSelection(at - head.length, at + tail.length)) { target.commit(new); target.setSelection(at, at) }
+            } finally { target.endBatch() }
+            return
+        }
         // Shift follows the word: locked for ALL CAPS, so the letters after it go on in capitals, off otherwise.
         val capitals = new.length > 1 && new == new.uppercase() && new != new.lowercase()
         shift.follow(capitals); wordLock = capitals; showPlane()

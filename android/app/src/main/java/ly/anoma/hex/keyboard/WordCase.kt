@@ -26,4 +26,16 @@ internal object WordCase {
         }
         return before.substring(start).takeIf { it.isNotEmpty() }
     }
+
+    /** The rest of the word the cursor is inside: the letters [after] it starts with (an apostrophe may join two). */
+    fun starting(after: String): String {
+        var end = 0
+        while (end < after.length) {
+            val c = after[end]
+            if (c.isLetter()) { end++; continue }
+            if ((c == '\'' || c == '’') && end > 0 && end + 1 < after.length && after[end + 1].isLetter()) { end++; continue }
+            break
+        }
+        return after.substring(0, end)
+    }
 }

@@ -49,6 +49,13 @@ class WordCaseTest {
         assertFalse(shift.locked)
     }
 
+    @Test fun theRestOfAWordAfterTheCursor() {
+        assertEquals("i", WordCase.starting("i native\""))      // "a‸i native": shift recases all of "ai"
+        assertEquals("n't", WordCase.starting("n't go"))
+        assertEquals("", WordCase.starting(" native"))
+        assertEquals("ab", WordCase.starting("ab'"))           // an apostrophe ends it unless a letter follows
+    }
+
     @Test fun shiftFollowsTheCaseATapGaveTheWord() {
         val shift = ShiftState()
         shift.hold(); shift.up(); shift.follow(capitals = true)   // "sf" → "SF": the letters after go on in capitals

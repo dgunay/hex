@@ -75,6 +75,17 @@ Each setting's commits still use the names it had when it was added. Commit hash
   delay).
 - **Commit:** `d0ddec12` Android Keyboard: Hold delay (Labs).
 
+### Click when a hold opens (Labs)
+
+- **Setting:** Labs › Keyboard › Click when a hold opens, off by default; needs Keyboard › Haptics on.
+- **What:** a click (the key press's own) the moment a held key's symbols or accents appear, so you feel that the
+  hold took. Before, a hold played nothing until the key lifted.
+- **Why:** asked for: "when long press to do a symbol happens can there be a small haptic click? right now its
+  nothing".
+- **How:** the hold's timer in `KeyPlaneView.typesOnLift` plays `Tap.Press` before `LetterFeedback.hold`.
+- **Limits:** a flick (SwiftKey layout's period, or sliding off a key) opens the options at once without a click,
+  since the finger is already moving. The Hex key's and the space bar's holds are unchanged.
+
 ### SwiftKey layout (Labs)
 
 ![Held A types @, held T types 5, a flick right off the period types ?, then the 123 and {&= pages](docs/fork-demos/swiftkey-layout.gif)
@@ -134,15 +145,37 @@ Each setting's commits still use the names it had when it was added. Commit hash
 - **Limits:**
   - At a word, a tap no longer turns shift on for the next letter (hold shift for a capital mid-word: "iP"), and two
     quick taps there recase twice rather than lock caps. Caps lock still goes off with a tap.
-  - The cursor must end the word: inside a word, or after its space, shift is as before.
+  - Inside a word ("a‸i") a tap recases the whole word and the cursor stays put; shift then goes off. Before a
+    word's first letter, or after its space, shift is as before.
 - **Commits:**
   - `739c9e87` Android Keyboard: Shift changes a word's case (Labs)
   - `ad40800a` Android Keyboard: Shift's keys follow a recased word's case (Labs)
+  - Android Keyboard: Shift recases a word with the cursor inside it (Labs)
 
 ## Fixes
 
 On for everyone. "Upstream too" means the bug is in code upstream also has, so the fix could be offered to them;
 "not checked" means that is read from the code, not yet reproduced on a plain upstream build.
+
+### English typing switched off by upstream's new model file
+
+- **What:** with upstream's English model update (#2973), English had no autocorrect, suggestions or swipe on the
+  phone: every letter typed as tapped.
+- **Why:** #2973 added `en.spellings` beside `en.hextm`, but not to the build's uncompressed files. The keyboard maps
+  its model files straight from the APK, which needs them stored uncompressed, so reading it failed, and the
+  editor's catch for unreadable assets quietly left typing off.
+- **How:** `spellings` joins `androidResources.noCompress` in `app/build.gradle.kts`.
+- **Upstream:** the same bug is on upstream's `dev`; worth a one-line PR there.
+
+### A comma after a picked word keeps the space after it
+
+- **What:** a strip word goes in with its space; a comma, period, ?, !, ;, : or ) typed next used to take that
+  space and leave none ("here," then a space by hand). The space now goes after the mark ("here, "), as Gboard does,
+  and a space typed next is swallowed as after a pick. The same goes for an autocorrection's space with Labs ›
+  Keyboard › Punctuation after autocorrect on. A URL field's marks still join ("github.").
+- **Why:** reported from the typing log (★ "I want a space after a comma here").
+- **How:** `SpaceRules.movesPickedSpace`; `KeyboardEngine.type` commits the mark with the space and keeps the
+  picked-space anchor after it.
 
 ### Strip taps that did nothing where text follows the cursor
 
