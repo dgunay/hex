@@ -31,24 +31,19 @@ Each setting's commits still use the names it had when it was added. Commit hash
   bar.
 - **Commit:** `639df77d` Android Keyboard: Keys down to the bar removes the gap under the bottom row.
 
-### Steadier suggestion strip, and More suggestions (Labs)
+### More suggestions (Labs)
 
 ![Typing "see you to", scrolling the strip past its three slots and picking "today"](docs/fork-demos/more-suggestions.gif)
 
-- **What:** while a word is typed, a word already shown in the strip keeps its slot when a later strip for the same
-  word comes (the fix after the pause, Neural autocorrect's ranked completions). With Labs › Keyboard › More
-  suggestions on (off by default), the strip scrolls right to 8 more words past its three slots, for a word being
-  typed, for the next word after a space (8 in all) and for an earlier word (8 in all).
-- **Why:** the strips arriving one after another moved the word about to be tapped ("gonna" jumped as "gone" came in),
-  and the three slots hid likely words.
-- **How:** `Suggestion.place(slots, previous)` keeps a shown word's slot while the word typed so far goes on; only
-  what was typed, the fix and the emoji have places of their own (the fix keeps the middle, so a word there moves
-  once to a free slot). Before the pause, a word the keyboard doesn't know is laid out as the strip after it will
-  be: what was typed on the left, the middle kept for the fix, the likeliest completion on the right
-  (`strip(fixLater = true)`), so "gonna" stays put when "gone" comes. `TypingWord.strip(more = 8)` returns the words past the slots in the same order, and
-  `StripView` lays the slots at the strip's width inside a `HorizontalScrollView` with the rest after them; a new
-  word scrolls back to the start.
-- **Commit:** Android Keyboard: Steadier suggestion strip, and More suggestions (Labs).
+- **What:** with Labs › Keyboard › More suggestions on (off by default), the strip scrolls right to 8 more words past
+  its three slots, for a word being typed, for the next word after a space (8 in all) and for an earlier word (8 in
+  all).
+- **Why:** the three slots hid likely words.
+- **How:** `TypingWord.strip(more = 8)` returns the words past the slots in the same order. Upstream's `SteadyStrip`
+  places the three slots, and `Suggestion.more` gives the rest; `StripView` lays the slots at the strip's width inside
+  a `HorizontalScrollView` with the rest after them. A new word scrolls back to the start; the same word's next strip
+  keeps the scroll.
+- **Commit:** Android Keyboard: More suggestions (Labs).
 
 ### Hold delay (Labs)
 
@@ -456,62 +451,6 @@ These are listed with their features; the bugs aren't in upstream's code.
 - **Limits:** the first start after the lab turns on can be silent while its set loads.
 - **Commit:** Android: Dictation sounds, desktop Hex's sound sets (Labs).
 
-## Dictation from another keyboard
-
-### Voice-only mode answers apps' speech requests
-
-- **Switch:** Labs › Keyboard › Voice-only mode (upstream's lab, off). This fork extends what it does.
-- **What:** SwiftKey's mic key now dictates with Hex. A Hex dictation bar appears over the app and starts
-  recording at once:
-  - ✓ types the text into the field.
-  - ✕, tapping outside the bar, or leaving the app types nothing.
-- **Why:** upstream's Voice-only mode adds a voice-only keyboard subtype for keyboards that switch to a voice
-  keyboard. SwiftKey only switches to one whose package starts with `com.google.android`, so it never picks Hex.
-  With Google Voice Typing declined, SwiftKey's mic instead launches the standard speech request,
-  `RecognizerIntent.ACTION_RECOGNIZE_SPEECH`, which any app may answer.
-- **How:**
-  - `VoiceInputActivity` declares an intent filter for `RECOGNIZE_SPEECH`. It's a translucent activity with
-    upstream's `VoiceBarView` at the bottom and upstream's `MicCapture`/`LocalSpeech` behind it, the same path
-    as the keyboard's dictation.
-  - It returns `RESULT_OK` with `EXTRA_RESULTS` (one result) and `EXTRA_CONFIDENCE_SCORES` (1.0), or
-    `RESULT_CANCELED`.
-  - The activity is enabled with `PackageManager.setComponentEnabledSetting` only while the lab is on, so with
-    the lab off Hex never shows up as a speech handler.
-- **Setup on the phone:** the first time, Android asks which app should handle speech. Choose Hex and "Always".
-- **Commit:** `afe6de6b` Android Keyboard: Voice-only mode answers apps' speech requests.
-
-### Getting the text into the field on Android 17
-
-- **Switch:** none; part of the above.
-- **What:** makes SwiftKey reliably type the result. Before this, on Android 17 the text was often lost, or typed
-  seconds later into whichever field was focused next (in another app).
-- **Why:** SwiftKey doesn't type the result when it arrives. It stores it and types it the next time its
-  keyboard starts on a field (`VoiceIntentApiTrigger` in `onStartInputView`). It tries once, reading the field
-  with `getExtractedText`, and drops the text if the field can't be read. Two Android 17 behaviours break that:
-  - If the speech window never took the keyboard from the app (`FLAG_ALT_FOCUSABLE_IM`), returning to the app is
-    a focus change Android only reports (`WINDOW_FOCUS_GAIN_REPORT_ONLY`). The keyboard doesn't start again, so
-    the text waits for the next field that starts it.
-  - If the speech window does take the keyboard, Compose and React Native apps (Claude, Contacts) restart their
-    field about 10–20 ms after getting focus back. SwiftKey's one try then lands on the connection being torn
-    down.
-- **How:**
-  1. While the bar listens, its window keeps `FLAG_ALT_FOCUSABLE_IM`, so the keyboard stays with the app's field.
-  2. When the text is ready, the bar hides and clears that flag, so the bar's window takes the keyboard for a
-     moment.
-  3. It waits until the keyboard's insets (`WindowInsets.Type.ime()`) show on its own window, plus 50 ms, then
-     finishes. It gives up waiting after 400 ms.
-  4. The app's field then reconnects once, with nothing for the app to restart, and SwiftKey's one try succeeds.
-- **Verified:** on an Android 17 emulator with SwiftKey, the text was lost 3 of 3 times before and typed 10 of 10
-  after. Also checked on Android 16, and on an Android 17 phone in the Claude app.
-- **Limits:**
-  - This works around SwiftKey's one-try behaviour; other keyboards that answer speech results differently were
-    not tested.
-  - While listening, the bar sits over the dimmed keyboard's bottom row.
-- **Commits:**
-  - `e9fc2c44` Android Keyboard: Hex's speech window takes input focus. An intermediate step, replaced by the next
-    commit.
-  - `f06fc06f` Android Keyboard: SwiftKey types Hex's dictation on Android 17.
-
 ## Dropped because upstream built it
 
 - **A clause mark takes autocorrect's space** ("keyboadr", space, "." gave "keyboard." instead of "keyboard .").
@@ -536,6 +475,14 @@ upstream's. Where upstream's differs from what the fork had:
   standard layout too: it reads only the text, so the space survives the switch to ?123, which the fork's didn't.
   It never takes a space right after the opening quote or one of several spaces.
 - **Strip taps that did nothing where text follows the cursor** (#3016): the same three cases, on for everyone.
+- **Steadier suggestion strip** (#3026): upstream's `SteadyStrip`, on for everyone, keeps a shown word in its slot
+  while the word is typed and lays an unknown word out with what was typed on the left before the pause, as the fork
+  did. It also keeps what was typed on the left once it showed for that word, even when the pause finds no fix.
+  More suggestions stays the fork's own.
+- **Voice-only mode answers apps' speech requests, and the Android 17 hand-back** (#3027): now its own lab, Labs ›
+  Keyboard › Answer apps' speech requests, off; the fork's came on with Voice-only mode. The same sheet and the same
+  hand-back timing (insets plus 50 ms, at most 400 ms). The activity has a new name, so the choice of which app
+  answers speech may need making again.
 
 ## This fork's builds
 
