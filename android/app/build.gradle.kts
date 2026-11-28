@@ -164,7 +164,7 @@ android {
     sourceSets["preview"].assets.srcDir("src/diagnostics/assets")
     packaging.resources.excludes += "DebugProbesKt.bin"
     buildFeatures { compose = true; buildConfig = true }
-    androidResources { noCompress += listOf("bin", "hextm", "valid", "capitals") }
+    androidResources { noCompress += listOf("bin", "hextm", "valid", "capitals", "spellings") }
     sourceSets["main"].assets.srcDir(modelAssets)
     // The same plain-text Android policy ships in Settings and in the Play listing drafts.
     sourceSets["main"].assets.srcDir(rootProject.file("play/policy"))

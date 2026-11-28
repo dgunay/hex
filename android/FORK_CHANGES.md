@@ -155,6 +155,16 @@ Each setting's commits still use the names it had when it was added. Commit hash
 On for everyone. "Upstream too" means the bug is in code upstream also has, so the fix could be offered to them;
 "not checked" means that is read from the code, not yet reproduced on a plain upstream build.
 
+### English typing switched off by upstream's new model file
+
+- **What:** with upstream's English model update (#2973), English had no autocorrect, suggestions or swipe on the
+  phone: every letter typed as tapped.
+- **Why:** #2973 added `en.spellings` beside `en.hextm`, but not to the build's uncompressed files. The keyboard maps
+  its model files straight from the APK, which needs them stored uncompressed, so reading it failed, and the
+  editor's catch for unreadable assets quietly left typing off.
+- **How:** `spellings` joins `androidResources.noCompress` in `app/build.gradle.kts`.
+- **Upstream:** the same bug is on upstream's `dev`; worth a one-line PR there.
+
 ### Strip taps that did nothing where text follows the cursor
 
 - **What:** a tap on a strip word was silently ignored in three places, all where text follows the cursor:
