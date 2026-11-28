@@ -86,6 +86,8 @@ internal class StripView(context: Context, private val ime: HexKeyboard, private
     private var undoing = false
     /** The hint line holds a dictation's note ("No speech heard", "Stopped at 1 minute"), not the idle hint. */
     private var noting = false
+    // The note gives the line back to the idle hint (and the menu) after NOTE_MS, or as soon as typing starts.
+    private val noteExpiry = Runnable { if (noting) ime.noteDone() }
     // A dismissible line in the hint's place (Hex Preview's update): it goes for this field once typing starts.
     // Labs › Keyboard › Emoji search: back to the panel, what was typed, and the emoji found, scrolling, in the slots' place.
     private val searchRow = LinearLayout(context)
@@ -327,6 +329,9 @@ internal class StripView(context: Context, private val ime: HexKeyboard, private
         // Typing or swiping started: the suggestions (a swipe's word so far) matter more than the notice, which comes
         // back in the next field.
         if (slots.any { it?.kind == Suggestion.Kind.Typed } || ime.engine.swiping) notice = null
+        // A dictation's note ("No speech heard") goes too once there is something to offer, so it doesn't come back
+        // when the word is deleted.
+        if (noting && (slots.any { it != null } || ime.engine.swiping)) { removeCallbacks(noteExpiry); ime.noteDone() }
         val shown = List(Suggestion.SLOTS) { slots.getOrNull(it) }
         // Labs › Keyboard › More suggestions: the words past the slots; a new word's strip starts scrolled back.
         if (!keepScroll) slotScroll.scrollTo(0, 0)
@@ -509,6 +514,8 @@ internal class StripView(context: Context, private val ime: HexKeyboard, private
     fun status(phase: SpeechPhase, hint: String, menuVisible: Boolean, note: Boolean = false) {
         this.hint = hint
         noting = note && phase == SpeechPhase.Idle
+        removeCallbacks(noteExpiry)
+        if (noting) postDelayed(noteExpiry, NOTE_MS)
         val wasIdle = idleRow.visibility == VISIBLE
         idle = phase == SpeechPhase.Idle
         val processing = phase == SpeechPhase.Transcribing
@@ -605,3 +612,6 @@ private fun dpToPx(size: Float, metrics: DisplayMetrics): Float =
  * ↶ alone and the note may take two lines; otherwise the chip says "Undo dictation" and the line is one. */
 internal data class UndoLook(val label: Boolean, val noteLines: Int)
 internal fun undoLook(shared: Boolean) = if (shared) UndoLook(label = false, noteLines = 2) else UndoLook(label = true, noteLines = 1)
+
+/** How long a dictation's note ("No speech heard") holds the strip's line before the idle hint comes back. */
+private const val NOTE_MS = 5_000L

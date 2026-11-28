@@ -89,6 +89,15 @@ Each setting's commits still use the names it had when it was added. Commit hash
 
 The fork's fixes to upstream's code are upstream now (see [Dropped because upstream built it](#dropped-because-upstream-built-it)).
 
+### A dictation's note gives the strip back
+
+- **What:** a note in the keyboard's strip after a dictation ("No speech heard", "Stopped at 1 minute", a microphone
+  or model error) goes after 5 seconds, or as soon as typing or a swipe offers words. Upstream keeps it until the next
+  dictation or field, and it came back after a typed word was deleted, hiding the idle hint.
+- **How:** `StripView` posts `noteExpiry` (`NOTE_MS`) when the note shows, and clears it when the strip has
+  suggestions; `HexKeyboard.noteDone` puts back the idle hint. Voice-only mode's bar keeps its own 1.2 s.
+- **Commit:** Android Keyboard: a dictation's note leaves the strip after 5 s or when you type.
+
 ### Fixes to this fork's own features
 
 These are listed with their features; the bugs aren't in upstream's code.

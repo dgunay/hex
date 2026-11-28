@@ -651,6 +651,8 @@ class HexKeyboard : InputMethodService() {
         bar?.removeCallbacks(pendingLeave)
         if (!switchToPreviousInputMethod()) getSystemService(InputMethodManager::class.java).showInputMethodPicker()
     }
+    /** The strip's dictation note had its time, or typing started: the idle hint (and the menu) come back. */
+    internal fun noteDone() { if (capture.phase == SpeechPhase.Idle) view?.status(capture.phase, idleHint()) }
     private fun showStatus(phase: SpeechPhase, note: String?) {
         // Hands-free dictation can outlast the display timeout; a hidden IME would cancel it.
         window?.window.keepAwake(phase)
