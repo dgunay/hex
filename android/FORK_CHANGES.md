@@ -312,6 +312,17 @@ These are listed with their features; the bugs aren't in upstream's code.
   (`theWordsSpaceAsksAboutAreAskedAhead`). A missed space's reading, which space only asks about after the model's
   first answer, still waits. Background reads go 4 words at a time (12 before), so a space typed straight after a
   letter waits behind at most 4.
+- **One change per pause:** the strip no longer shows the word pairs' order and then reshuffles into the model's.
+  - While a word is typed, each letter shows what was typed at once, beside the words already showing that still
+    start with the letters (none as a fix).
+  - After 150 ms without a letter (`NEURAL_PAUSE_MS`, about the median gap between keys in the typing log), the
+    model is asked for the order, and the strip changes once, when it answers. That also saves power, since fast
+    typing no longer asks after every letter.
+  - Next words after a space wait for the model too, with the strip empty meanwhile.
+  - Without an answer in 200 ms (`NEURAL_WAIT_MS`), the strip shows the word pairs' order, and a later answer
+    waits for the next letter.
+  - The readings space asks about are still asked after every letter, so space's correction is unchanged.
+  - Commit: Android Keyboard: Neural autocorrect's strip changes once, when the model answers.
 - **Too late:** a read space gave up waiting for leaves the worker's queue if it hasn't started, so it never holds up
   the reads behind it (the strip's, the next word's).
 - **Limits:**

@@ -295,14 +295,16 @@ internal class TypingWord(val decoder: SpatialDecoder, val spatial: Boolean) {
     /** Labs › Keyboard › Neural autocorrect: asks the model, without waiting, how likely each completion of the word
      * typed so far is in the sentence: the word pairs' few after the word before and the commonest, [NEURAL_COMPLETIONS]
      * in all. [post] runs its answer on the keyboard's thread, where [answered] shows the strip again; a word typed on
-     * meanwhile has asked again, and the old answer is dropped. English only, as the rest of the lab. */
-    fun rankCompletions(post: (() -> Unit) -> Unit, answered: () -> Unit) {
-        val neural = decoder.neural?.takeIf { it.active } ?: return
-        if (!spatial || standIn || model.language != "en" || token.isEmpty() || token.length > MAX_LENGTH) return
+     * meanwhile has asked again, and the old answer is dropped. English only, as the rest of the lab. Returns where
+     * the model's order is: [Rank.Ready], [Rank.Asked] (its answer on the way) or [Rank.None] (none coming). */
+    fun rankCompletions(post: (() -> Unit) -> Unit, answered: () -> Unit): Rank {
+        if (!modelRanks()) return Rank.None
+        val neural = decoder.neural ?: return Rank.None
         val lower = lookup(token.lowercase())
         // The same letters in another sentence are another question.
         val key = before + '\u0000' + lower
-        if (ranked?.first == key || asked == key) return
+        if (ranked?.first == key) return Rank.Ready
+        if (asked == key) return Rank.Asked
         val words = LinkedHashSet<String>()
         if (token.length <= 3) for (w in model.completionsAfter(lower, previous, suggestSwearWords)) words += model.text(w)
         for (w in model.completions(lower, suggestSwearWords, previous, NEURAL_COMPLETIONS)) {
@@ -310,7 +312,7 @@ internal class TypingWord(val decoder: SpatialDecoder, val spatial: Boolean) {
             words += model.text(w)
         }
         words.removeAll { it.equals(lower, ignoreCase = true) }
-        if (words.size < 2) return
+        if (words.size < 2) return Rank.None
         asked = key
         // As the decoder writes a word for the model: a capital only where one was typed, so space finds them read.
         val capital = token.first().isUpperCase()
@@ -323,7 +325,15 @@ internal class TypingWord(val decoder: SpatialDecoder, val spatial: Boolean) {
                 answered()
             }
         }
+        return Rank.Asked
     }
+
+    /** Where the model's order of a strip is ([rankCompletions], [rankPredictions]). */
+    enum class Rank { None, Asked, Ready }
+
+    /** Labs › Keyboard › Neural autocorrect is loaded and ranks this word's completions ([rankCompletions]). */
+    fun modelRanks() = decoder.neural?.active == true && spatial && !standIn && model.language == "en" &&
+        token.length in 1..MAX_LENGTH
 
     /** The next words after [previous] (its word index [index]): the word pairs' likeliest [count], then the
      * language's commonest. */
@@ -360,16 +370,17 @@ internal class TypingWord(val decoder: SpatialDecoder, val spatial: Boolean) {
     /** Labs › Keyboard › Neural autocorrect: as [rankCompletions], for the words [predictions] offers after a space
      * in the middle of a sentence: the word pairs' likeliest after the word before and the commonest words,
      * [NEURAL_COMPLETIONS] in all, read with the whole text before them. */
-    fun rankPredictions(before: String, post: (() -> Unit) -> Unit, answered: () -> Unit) {
-        val neural = decoder.neural?.takeIf { it.active } ?: return
-        if (standIn || model.language != "en") return
+    fun rankPredictions(before: String, post: (() -> Unit) -> Unit, answered: () -> Unit): Rank {
+        val neural = decoder.neural?.takeIf { it.active } ?: return Rank.None
+        if (standIn || model.language != "en") return Rank.None
         val text = if (before.lastOrNull()?.let { it.isLetter() || it == '\'' || it == '\u2019' } == true) "$before " else before
-        if (startsSentence(text) || !text.last().isWhitespace() || text.dropLast(1).lastOrNull()?.let { it in midSentenceMarks } == true) return
-        if (rankedNext?.first == text || askedNext == text) return
-        val finished = currentToken(text.dropLast(1)) ?: return
+        if (startsSentence(text) || !text.last().isWhitespace() || text.dropLast(1).lastOrNull()?.let { it in midSentenceMarks } == true) return Rank.None
+        if (rankedNext?.first == text) return Rank.Ready
+        if (askedNext == text) return Rank.Asked
+        val finished = currentToken(text.dropLast(1)) ?: return Rank.None
         val previous = lookup(finished.lowercase())
         val list = nextPool(previous, model.context(previous), NEURAL_COMPLETIONS).take(NEURAL_COMPLETIONS)
-        if (list.size < 2) return
+        if (list.size < 2) return Rank.None
         askedNext = text
         // Written for the model as the strip shows them ("I", names with their capital).
         neural.costsLater(text, list.map { displayed(it) }, "next words") { costs ->
@@ -379,6 +390,7 @@ internal class TypingWord(val decoder: SpatialDecoder, val spatial: Boolean) {
                 answered()
             }
         }
+        return Rank.Asked
     }
 
     // A candidate cased as the word was typed, with the capital the strip shows for names.

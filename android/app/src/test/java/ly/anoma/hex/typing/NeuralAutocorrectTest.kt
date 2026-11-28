@@ -97,7 +97,7 @@ class NeuralAutocorrectTest {
         assertTrue("the commonest go… words and gonna: ${stand.asked}", "gonna" in stand.asked.single() && stand.asked.single().size <= TypingWord.NEURAL_COMPLETIONS)
         assertEquals("the model's likeliest first, after the word as typed", "gonna",
             w.strip(autocorrect = false).first { it.kind != Suggestion.Kind.Typed }.text)
-        w.rankCompletions({ it() }) { answers++ }
+        assertEquals("the order is ready for the same letters", TypingWord.Rank.Ready, w.rankCompletions({ it() }) { answers++ })
         assertEquals("asked once for the same letters", 1, answers)
         type("We were probably ", "gon")
         w.rankCompletions({ it() }) {}
@@ -156,12 +156,12 @@ class NeuralAutocorrectTest {
         val other = TypingWord(SpatialDecoder(model).also { it.neural = Stand(setOf(asked.last())) }, true).also { it.reset(before) }
         other.rankPredictions(before, { it() }) {}
         assertEquals("the model's likeliest first", asked.last(), other.predictions(before).first().lowercase())
-        w.rankPredictions(before, { it() }) { answers++ }
+        assertEquals(TypingWord.Rank.Ready, w.rankPredictions(before, { it() }) { answers++ })
         assertEquals("asked once for the same text", 1, answers)
         assertEquals("another sentence keeps the pairs' order", w.predictions("Can you send me the ").also { w.reset("Can you send me the ") },
             TypingWord(SpatialDecoder(model), true).predictions("Can you send me the "))
         stand.asked.clear()
-        w.rankPredictions("Hello. ", { it() }) { answers++ }
+        assertEquals(TypingWord.Rank.None, w.rankPredictions("Hello. ", { it() }) { answers++ })
         assertTrue("a sentence's start isn't asked", stand.asked.isEmpty())
     }
 

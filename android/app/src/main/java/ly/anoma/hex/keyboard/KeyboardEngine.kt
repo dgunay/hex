@@ -108,6 +108,11 @@ internal class KeyboardEngine(
         /** The fix and the decoder's readings wait for this pause in typing: working them out costs a
          * search (2 ms median, 16 ms p95 per letter on the API 31 emulator), which shouldn't delay keys. */
         const val CHIP_PAUSE_MS = 100L
+        /** Labs › Keyboard › Neural autocorrect: the pause in typing after which the model is asked for the strip's order
+         * ([holdForModel]). The median gap between keys is about 150 ms, so about half the letters typed ask it. */
+        const val NEURAL_PAUSE_MS = 150L
+        /** ...and the longest the strip waits for its answer before showing the word pairs' order. */
+        const val NEURAL_WAIT_MS = 200L
         /** Words past the strip's three slots, which it scrolls to. */
         const val MORE_WORDS = 8
         /** Labs › Keyboard › Emoji search: the most found emoji the strip scrolls through, and the longest search. */
@@ -504,6 +509,7 @@ internal class KeyboardEngine(
                 if (it.kind == Suggestion.Kind.Fix && feedback.blocked(w.decoder.model.language, token, it.text))
                     Suggestion(it.text, Suggestion.Kind.Word) else it
             }.map(::shown), emojiFor(w)), typed)
+            if (w.modelRanks()) { holdForModel(w, token, typed, pause, ::quick, ::full); return }
             // Labs › Keyboard › Neural autocorrect: the completions, ranked by the model once it has read them, take
             // their places in whichever strip is showing by then.
             w.rankCompletions({ main.post(it) }) {
@@ -523,8 +529,38 @@ internal class KeyboardEngine(
         val b = if (w != null && !symbols && selStart == selEnd) before() else null
         showPredictions(if (b != null && TypingWord.boundary(b.lastOrNull())) b else null)
     }
+    /**
+     * Labs › Keyboard › Neural autocorrect, once loaded: the strip changes once per pause, in the model's order, rather
+     * than in the word pairs' order and then again in the model's. Each letter shows what was typed at once, beside the
+     * strip already showing (its words that still start with the letters, none of them a fix). After [NEURAL_PAUSE_MS]
+     * without a letter the model is asked for its order, and its strip shows when it answers ([full] after a pause that
+     * offers a fix, else [quick]); one it doesn't answer within [NEURAL_WAIT_MS] shows in the word pairs' order, and a
+     * later answer waits for the next letter. The readings space asks about are still asked after every letter.
+     */
+    private fun holdForModel(w: TypingWord, token: String, typed: Suggestion, pause: Boolean, quick: () -> Unit, full: () -> Unit) {
+        val kept = held.filter { it.kind != Suggestion.Kind.Typed && it.kind != Suggestion.Kind.Emoji &&
+            it.text.startsWith(token, ignoreCase = true) && !it.text.equals(token, ignoreCase = true) }
+            .map { if (it.kind == Suggestion.Kind.Word) it else Suggestion(it.text, Suggestion.Kind.Word) }
+        showWord(token, listOf(typed) + kept, typed, early = true)
+        main.post {
+            if (word === w && w.token == token) w.prescore()?.let { ms -> TypingLog.event { "neural ahead decided in ${ms}ms" } }
+        }
+        fun show() { if (word === w && w.token == token) { if (pause) full() else quick() } }
+        pendingChip = Runnable {
+            pendingChip = null
+            if (word !== w || w.token != token) return@Runnable
+            var waiting: Runnable? = null
+            val rank = w.rankCompletions({ main.post(it) }) {
+                if (waiting != null && pendingChip === waiting) { cancelChip(); show() }
+            }
+            if (rank != TypingWord.Rank.Asked) { show(); return@Runnable }
+            waiting = Runnable { pendingChip = null; show() }.also { pendingChip = it; main.postDelayed(it, NEURAL_WAIT_MS) }
+        }.also { main.postDelayed(it, NEURAL_PAUSE_MS) }
+    }
+
     /** The word being typed's strip, its words kept in their slots ([SteadyStrip]). */
     private fun showWord(token: String, slots: List<Suggestion>, typed: Suggestion?, early: Boolean = false) {
+        held = slots
         val placed = steady.arrange(token, slots, typed, early)
         // The same word goes on (one is the start of the other): More suggestions' scroll stays where it was.
         val same = stripToken.isNotEmpty() && (token.startsWith(stripToken, true) || stripToken.startsWith(token, true))
@@ -532,9 +568,11 @@ internal class KeyboardEngine(
         surface?.shown(placed, Suggestion.more(slots, placed), keepScroll = same)
     }
     private var stripToken = ""
+    /** The last strip [showWord] showed, which [holdForModel] keeps while the model is asked. */
+    private var held: List<Suggestion> = emptyList()
     /** Any other strip (next words, a swipe's, nothing): the next word's strip is laid out afresh. */
     private fun showStrip(slots: List<Suggestion>) {
-        steady.forget(); stripToken = ""
+        steady.forget(); stripToken = ""; held = emptyList()
         surface?.suggestions(slots)
     }
     /** The current word's emoji when Labs › Keyboard › Emoji suggestions is on and the word names
@@ -556,11 +594,29 @@ internal class KeyboardEngine(
     }
 
     /** Next words for the text before the cursor, capitalised as shift would be. An empty field with
-     * Keyboard tools on leaves the strip's line to the tools instead of sentence starters. */
-    private fun showPredictions(before: String?) {
+     * Keyboard tools on leaves the strip's line to the tools instead of sentence starters. [pairs]: in the word pairs'
+     * order, without asking the model. */
+    private fun showPredictions(before: String?, pairs: Boolean = false) {
+        pendingNext?.let(main::removeCallbacks); pendingNext = null
         val w = word
         val shows = w != null && before != null && !symbols && canEndWord() &&
             !KeyboardTools.showsInEmptyField(feedback.keyboardTools, before) { target.after(1) }
+        fun current() = word === w && w!!.token.isEmpty() && before() == before
+        // Labs › Keyboard › Neural autocorrect: the next words show once, in the model's order, once it has read the
+        // sentence; the strip is empty meanwhile. Without its answer in NEURAL_WAIT_MS they show in the word pairs' order,
+        // and a later answer is left unshown.
+        if (shows && !pairs) {
+            var waiting: Runnable? = null
+            val rank = w!!.rankPredictions(before!!, { main.post(it) }) {
+                if (waiting != null && pendingNext === waiting && current()) showPredictions(before)
+            }
+            if (rank == TypingWord.Rank.Asked) {
+                showStrip(emptyList())
+                waiting = Runnable { pendingNext = null; if (current()) showPredictions(before, pairs = true) }
+                    .also { pendingNext = it; main.postDelayed(it, NEURAL_WAIT_MS) }
+                return
+            }
+        }
         // Next words go through the steady strip keyed apart from any typed word ("\u0000"), so a word shown keeps its
         // slot when the model's order comes; anything else starts afresh.
         // Labs › Keyboard › More suggestions: the next words past the three slots, a scroll away, as for a word typed.
@@ -568,11 +624,9 @@ internal class KeyboardEngine(
         if (shows) showWord("\u0000" + before, w!!.predictions(before!!, capitalize = capsWanted()).take(count)
             .map { shown(Suggestion(it, Suggestion.Kind.Next)) }, null)
         else showStrip(emptyList())
-        // Labs › Keyboard › Neural autocorrect: the model's order, once it has read the sentence, if nothing was typed since.
-        if (shows) w!!.rankPredictions(before!!, { main.post(it) }) {
-            if (word === w && w.token.isEmpty() && before() == before) showPredictions(before)
-        }
     }
+    /** The next words' wait for the model's order ([showPredictions]). */
+    private var pendingNext: Runnable? = null
 
     /** A slot as the strip shows it: with Labs › Keyboard › Smart quotes on, a word shows the ’ it
      * will insert ("I'm" shows "I’m"). A pick runs [smartWord] over this text again, which leaves a
