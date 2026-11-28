@@ -18,7 +18,13 @@ internal data class Suggestion(val text: String, val kind: Kind) {
         /** [slots] with [emoji] appended, dropping the least likely word to make room. A null
          * [emoji] leaves [slots] exactly as they were. */
         fun withEmoji(slots: List<Suggestion>, emoji: String?): List<Suggestion> =
-            if (emoji == null) slots else slots.take(SLOTS - 1) + Suggestion(emoji, Kind.Emoji)
+            if (emoji == null) slots else slots.take(SLOTS - 1) + Suggestion(emoji, Kind.Emoji) + slots.drop(SLOTS - 1)
+
+        /** The words after [shown]'s, for the strip's scroll: [slots]' own, in their order. */
+        fun more(slots: List<Suggestion>, shown: List<Suggestion?>): List<Suggestion> {
+            val taken = shown.mapNotNull { it?.text }.toSet()
+            return slots.filter { it.kind != Kind.Emoji && it.kind != Kind.Typed && it.text !in taken }
+        }
 
         /** The strip's [SLOTS] slots in display order. With a [Kind.Typed] slot they show as given,
          * except that the emoji is padded into the last slot (so `[Typed]` plus an emoji leaves the
@@ -221,7 +227,7 @@ internal class TypingWord(val decoder: SpatialDecoder, val spatial: Boolean) {
      * space would put in and the readings are offered too, as plain words space never puts in (Keyboard ›
      * Autocorrect off, as Gboard keeps its suggestions with auto-correction off). */
     @JvmOverloads
-    fun strip(autocorrect: Boolean = true, nearWords: Boolean = autocorrect): List<Suggestion> {
+    fun strip(autocorrect: Boolean = true, nearWords: Boolean = autocorrect, more: Int = 0): List<Suggestion> {
         if (token.length !in 1..MAX_LENGTH) return emptyList()
         val typed = Suggestion(token, Suggestion.Kind.Typed)
         // Your shortcut: what you typed and its phrase, which space puts in whatever autocorrect does.
@@ -231,7 +237,8 @@ internal class TypingWord(val decoder: SpatialDecoder, val spatial: Boolean) {
         val pool = ArrayList<String>(4)
         val lower = lookup(token.lowercase())
         val showTyped = standIn || fix != null || near != null || blocked(token) || knows(lower)
-        val size = if (showTyped) 2 else 3
+        // [more]: words past the strip's slots, for its scroll, in the same order.
+        val size = (if (showTyped) 2 else 3) + more
         val lowered = !addsCapitals && token.none { it.isUpperCase() }
         fun add(word: String) {
             val s = if (lowered && decoder.personal?.owns(word) != true) word.lowercase() else word
@@ -266,7 +273,7 @@ internal class TypingWord(val decoder: SpatialDecoder, val spatial: Boolean) {
         for (s in short) add(s)
         // Your own words before the rest of the dictionary's (iOS lists UILexicon terms with them).
         decoder.personal?.completions(lookup(token))?.forEach { add(yours(it)) }
-        if (!standIn && neural == null) for (w in model.completions(lower, suggestSwearWords, previous)) add(shown(model.text(w)))
+        if (!standIn && neural == null) for (w in model.completions(lower, suggestSwearWords, previous, 3 + more)) add(shown(model.text(w)))
         if (readings && token.length < 3) for (r in decision().readings) add(reading(r.text))
         if (pool.isEmpty()) return listOf(typed)
         val first = if (fix != null) Suggestion(fix, Suggestion.Kind.Fix) else Suggestion(pool[0], Suggestion.Kind.Word)

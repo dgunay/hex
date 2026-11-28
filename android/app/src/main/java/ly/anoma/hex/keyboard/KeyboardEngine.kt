@@ -32,9 +32,11 @@ internal interface KeyboardSurface {
     fun showPage(page: KeyboardPage)
     /** The strip, in the typing model's order: what was typed first when it shows, then the fix or the
      * likeliest word, then the rest. Next words after a space are [Suggestion.Kind.Next]. */
-    fun suggestions(slots: List<Suggestion>) = shown(Suggestion.place(slots))
+    fun suggestions(slots: List<Suggestion>) = Suggestion.place(slots).let { shown(it, Suggestion.more(slots, it)) }
     /** The strip's slots as shown, left to right ([Suggestion.SLOTS], null for an empty one). */
-    fun shown(slots: List<Suggestion?>)
+    /** [more]: the words past the slots (Labs › Keyboard › More suggestions), a scroll away; [keepScroll] leaves the
+     * strip scrolled where it was, the same word's next strip. */
+    fun shown(slots: List<Suggestion?>, more: List<Suggestion> = emptyList(), keepScroll: Boolean = false)
     /** Offer Undo dictation, or stop offering it. */
     fun undoDictation(shown: Boolean)
     /** The strip's tools changed (Labs › Keyboard › Keyboard tools): Undo follows the last autocorrection. */
@@ -102,6 +104,8 @@ internal class KeyboardEngine(
         /** The fix and the decoder's readings wait for this pause in typing: working them out costs a
          * search (2 ms median, 16 ms p95 per letter on the API 31 emulator), which shouldn't delay keys. */
         const val CHIP_PAUSE_MS = 100L
+        /** Words past the strip's three slots, which it scrolls to. */
+        const val MORE_WORDS = 8
         /** Undo dictation stays this long unless something else happens first (iPhone Hex: 12 s). */
         const val UNDO_MS = 12_000L
         /** Autocorrections a field remembers for Keyboard › Fix earlier words. */
@@ -415,14 +419,16 @@ internal class KeyboardEngine(
             val token = w.token
             val pause = correctingField && !w.standIn && canEndWord()
             val typed = shown(Suggestion(token, Suggestion.Kind.Typed))
-            fun quick() = showWord(token, Suggestion.withEmoji(w.strip(autocorrect = false).map(::shown), emojiFor(w)),
+            // Labs › Keyboard › More suggestions: words past the three slots, a scroll away.
+            val more = if (feedback.moreSuggestions) MORE_WORDS else 0
+            fun quick() = showWord(token, Suggestion.withEmoji(w.strip(autocorrect = false, more = more).map(::shown), emojiFor(w)),
                 if (pause) typed else null, early = pause)
             quick()
             // A stand-in's strip already is the finished one: nothing there changes after the pause.
             // A field that asked for no suggestions of its own gets no fix: space leaves its words alone.
             // With Keyboard › Autocorrect off the near words still come, as plain words space never puts in.
             val fixes = feedback.autocorrect
-            fun full() = showWord(token, Suggestion.withEmoji(w.strip(fixes, nearWords = true).map {
+            fun full() = showWord(token, Suggestion.withEmoji(w.strip(fixes, nearWords = true, more = more).map {
                 if (it.kind == Suggestion.Kind.Fix && feedback.blocked(w.decoder.model.language, token, it.text))
                     Suggestion(it.text, Suggestion.Kind.Word) else it
             }.map(::shown), emojiFor(w)), typed)
@@ -442,11 +448,17 @@ internal class KeyboardEngine(
         showPredictions(if (b != null && TypingWord.boundary(b.lastOrNull())) b else null)
     }
     /** The word being typed's strip, its words kept in their slots ([SteadyStrip]). */
-    private fun showWord(token: String, slots: List<Suggestion>, typed: Suggestion?, early: Boolean = false) =
-        surface?.shown(steady.arrange(token, slots, typed, early))
+    private fun showWord(token: String, slots: List<Suggestion>, typed: Suggestion?, early: Boolean = false) {
+        val placed = steady.arrange(token, slots, typed, early)
+        // The same word goes on (one is the start of the other): More suggestions' scroll stays where it was.
+        val same = stripToken.isNotEmpty() && (token.startsWith(stripToken, true) || stripToken.startsWith(token, true))
+        stripToken = token
+        surface?.shown(placed, Suggestion.more(slots, placed), keepScroll = same)
+    }
+    private var stripToken = ""
     /** Any other strip (next words, a swipe's, nothing): the next word's strip is laid out afresh. */
     private fun showStrip(slots: List<Suggestion>) {
-        steady.forget()
+        steady.forget(); stripToken = ""
         surface?.suggestions(slots)
     }
     /** The current word's emoji when Labs › Keyboard › Emoji suggestions is on and the word names

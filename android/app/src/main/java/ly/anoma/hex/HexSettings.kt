@@ -181,6 +181,7 @@ internal fun HexSettings(setup: Setup, speech: SpeechPreferences, typing: Typing
     val closingQuoteTakesSpace = remember(revision) { typing.closingQuoteTakesSpace }
     val swiftKeyLayout = remember(revision) { typing.swiftKeyLayout }
     val learnWords = remember(revision) { typing.learnWords }
+    val moreSuggestions = remember(revision) { typing.moreSuggestions }
     val adaptiveTouch = remember(revision) { typing.adaptiveTouch }
     // Labs › Keyboard › Adaptive touch: how far it has learned (labelled taps on one key plane, and whether any reads your
     // own centres), and whether the phone keeps averages, which Reset touch learning removes even with the lab off.
@@ -636,6 +637,8 @@ internal fun HexSettings(setup: Setup, speech: SpeechPreferences, typing: Typing
                                 Rule()
                                 Toggle(stringResource(R.string.closing_quote_takes_space), stringResource(R.string.closing_quote_takes_space_detail),
                                     closingQuoteTakesSpace) { typing.closingQuoteTakesSpace = it }
+                                Toggle(stringResource(R.string.more_suggestions), stringResource(R.string.more_suggestions_detail),
+                                    moreSuggestions) { typing.moreSuggestions = it }
                                 Rule()
                                 Toggle(stringResource(R.string.swiftkey_layout), stringResource(R.string.swiftkey_layout_detail),
                                     swiftKeyLayout) { typing.swiftKeyLayout = it }

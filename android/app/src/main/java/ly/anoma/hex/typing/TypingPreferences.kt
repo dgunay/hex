@@ -132,6 +132,10 @@ internal class TypingPreferences(context: Context) {
     var learnWords: Boolean
         get() = prefs.getBoolean(LEARN_WORDS, false)
         set(value) { prefs.edit().putBoolean(LEARN_WORDS, value).apply() }
+    /** Labs › Keyboard › More suggestions: the strip scrolls right to more words past its three slots. Off by default. */
+    var moreSuggestions: Boolean
+        get() = prefs.getBoolean(MORE_SUGGESTIONS, false)
+        set(value) { prefs.edit().putBoolean(MORE_SUGGESTIONS, value).apply() }
     /** Labs › Keyboard › Adaptive touch: the decoder reads taps with your own key centres once it has learned them
      * ([AdaptiveTouch], kept by [AdaptiveTouchStore]). Off by default. */
     var adaptiveTouch: Boolean
@@ -236,6 +240,7 @@ internal class TypingPreferences(context: Context) {
         const val CLOSING_QUOTE_TAKES_SPACE = "closingQuoteTakesSpace"
         const val SWIFTKEY_LAYOUT = "swiftKeyLayout"
         const val LEARN_WORDS = "learnWords"
+        const val MORE_SUGGESTIONS = "moreSuggestions"
         const val ADAPTIVE_TOUCH = "adaptiveTouch"
         const val NEURAL_AUTOCORRECT = "neuralAutocorrect"
         const val NEURAL_BUDGET = "neuralBudget"

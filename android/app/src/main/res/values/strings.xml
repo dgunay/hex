@@ -251,6 +251,8 @@
     <string name="delete_words_delay_ms">%1$d ms</string>
     <string name="delete_words_speedup">Acceleration</string>
     <string name="delete_words_speedup_percent">%1$d%%</string>
+    <string name="more_suggestions">More suggestions</string>
+    <string name="more_suggestions_detail">Scroll the suggestion strip right for more words</string>
     <string name="marks_take_fix_space">Punctuation after autocorrect</string>
     <string name="marks_take_fix_space_detail">A period or comma right after an autocorrection goes against the word</string>
     <string name="marks_keep_space">Space after punctuation</string>
